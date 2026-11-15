@@ -1,0 +1,4 @@
+# Strip notebook outputs on commit. Each member runs `nbstripout --install` once
+# after cloning (see README); without it this line has no effect.
+*.ipynb filter=nbstripout
+*.ipynb diff=ipynb

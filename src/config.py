@@ -25,3 +25,6 @@ TEXT_COLUMNS = ["FILENAME", "URL", "Domain", "TLD", "Title"]
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
+
+# Folds for cross-validation on the training set (tuning / model selection).
+CV_FOLDS = 5

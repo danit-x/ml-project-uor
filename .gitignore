@@ -2,6 +2,9 @@
 data/raw/*
 data/processed/*
 saved_models/*
+*.joblib
+# Quick --sample runs; only the full-dataset reports/results.csv is committed
+reports/results_sample_*.csv
 !**/.gitkeep
 
 # Python

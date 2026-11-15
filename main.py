@@ -5,7 +5,8 @@
     python main.py --data path/to/file.csv
 
 Trains the four models on the original features and on the engineered
-features, evaluates them the same way, and writes reports/results.csv.
+features, evaluates them the same way, and writes reports/results.csv
+(or reports/results_sample_N.csv for a --sample run).
 """
 import argparse
 
@@ -23,7 +24,12 @@ def run(data_path=None, sample=None, save_models=True):
 
     original = data.get_original_features(df)
     df = features.add_features(df)
-    engineered = features.select_features(df, original + features.ENGINEERED_FEATURES)
+
+    # Feature selection may learn from the data, so it only sees training rows.
+    # data.split() picks the same rows for any column list (same y, same seed).
+    candidates = original + features.ENGINEERED_FEATURES
+    X_train_all, _, _, _ = data.split(df, candidates)
+    engineered = features.select_features(df.loc[X_train_all.index], candidates)
 
     feature_sets = {"original": original, "engineered": engineered}
     results = {}
@@ -41,7 +47,10 @@ def run(data_path=None, sample=None, save_models=True):
 
     table = evaluate.compare(results)
     config.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    table.to_csv(config.RESULTS_DIR / "results.csv", index=False)
+    # A sample run must never overwrite the full-dataset results.
+    out_name = f"results_sample_{sample}.csv" if sample else "results.csv"
+    table.to_csv(config.RESULTS_DIR / out_name, index=False)
+    print(f"Saved {config.RESULTS_DIR / out_name}")
     print()
     print(table.round(4).to_string(index=False))
     return table

@@ -19,6 +19,11 @@ ENGINEERED_FEATURES = [
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     """Return a copy of df with the engineered features added.
 
+    This runs on the whole dataset before the train/test split, so every
+    feature must be row-wise: computed from that row alone. No counts,
+    vocabularies, means or other statistics across rows (that would leak
+    test data into training).
+
     The two features below are examples only.
     TODO (owner): replace / extend with meaningful URL features, e.g. counts of
     particular characters, ratios, subdomain depth, combinations of existing
@@ -35,6 +40,10 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def select_features(df: pd.DataFrame, feature_cols: list) -> list:
     """Return the list of features to keep for modelling.
+
+    main.py passes the training rows only (target column included), so
+    correlation / importance analysis here never sees the test set. Keep it
+    that way when calling it from a notebook: pass df.loc[X_train.index].
 
     TODO (owner): remove redundant, irrelevant or highly correlated features
     (correlation analysis, importance scores, etc.) and justify the choice.

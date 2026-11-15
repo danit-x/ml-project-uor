@@ -22,6 +22,8 @@ metrics, and run it on both the original and the engineered features.
 
 ## Setup
 
+Needs Python 3.12 or newer.
+
 ```bash
 git clone git@github.com:danit-x/ml-project-uor.git
 cd ml-project-uor
@@ -31,6 +33,7 @@ python -m venv .venv
 # source .venv/bin/activate     # macOS / Linux
 
 pip install -r requirements.txt
+nbstripout --install            # once per clone: strips notebook outputs on commit
 ```
 
 ### Dataset
@@ -50,8 +53,10 @@ the risk score refer to phishing.
 python main.py --sample 20000
 ```
 
-This runs the whole pipeline on a 20,000-row sample and prints a results table.
-`python main.py` runs it on the full dataset (the SVM takes a while).
+This runs the whole pipeline on a 20,000-row sample, prints a results table and
+saves it to `reports/results_sample_20000.csv` (not committed).
+`python main.py` runs it on the full dataset (the SVM takes a while) and writes
+`reports/results.csv`, the file we report from.
 
 ## How we work
 
@@ -65,14 +70,24 @@ This runs the whole pipeline on a 20,000-row sample and prints a results table.
 You do not have to wait for anyone. Every part already has a working baseline,
 so start from the raw dataset and replace the baseline with your real work.
 
+If you use Claude Code, `CLAUDE.md` holds the project rules it follows. Tell it
+which member you are at the start of a session.
+
 ## Shared rules
 
-- Settings live in `src/config.py` (`RANDOM_STATE = 42`, `TEST_SIZE = 0.2`).
-  Do not change them on your own; agree in the group first.
-- Always split with `data.split()` and evaluate with `evaluate.evaluate()`, so
-  all four models are compared on the same test set with the same metrics.
+- Settings live in `src/config.py` (`RANDOM_STATE = 42`, `TEST_SIZE = 0.2`,
+  `CV_FOLDS = 5`). Do not change them on your own; agree in the group first.
+- Always split with `data.split()`, so all four models use the same test set.
+- Develop and tune with cross-validation on the training set only:
+  `evaluate.cv_evaluate()`, or `cv=evaluate.cv_splitter()` in `GridSearchCV`.
+  Use `evaluate.evaluate()` on the test set once, for the final numbers.
+- Anything fitted (scaling, imputation, selection) goes inside the model's
+  pipeline so it only learns from training data.
 - Keep the existing function names. `main.py` calls them to combine everything.
 - Save figures to `reports/figures/`.
+- Shared files with no single owner (`src/config.py`, `src/__init__.py`,
+  `src/models/__init__.py`, `requirements.txt`, `.gitignore`, `.gitattributes`,
+  `README.md`, `CLAUDE.md`): change them only after the group agrees.
 
 ## Project layout
 

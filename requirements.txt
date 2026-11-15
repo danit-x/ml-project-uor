@@ -1,8 +1,11 @@
-pandas
-numpy
-scikit-learn
-matplotlib
-seaborn
-shap
-joblib
-jupyter
+# Python 3.12 or newer. Versions fixed to a minor release so results are
+# reproducible across members; change only with group agreement.
+pandas~=3.1.1
+numpy~=2.5.4
+scikit-learn~=1.9.1
+matplotlib~=3.11.2
+seaborn~=0.13.2
+shap~=0.54.1
+joblib~=1.6.0
+jupyter~=1.1.1
+nbstripout~=0.9.1

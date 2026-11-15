@@ -24,8 +24,14 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     - inspect and report duplicates, missing and inconsistent values
     - if several dataset files exist, check structure and overlap before combining
     - decide how each problem is handled and justify it in the notebook
+    - check whether repeated URLs carry conflicting labels
+
+    Do not impute with statistics of the whole dataset here (that leaks test
+    data); put imputers in the model pipelines instead.
     """
     df = df.drop_duplicates()
+    # The same URL in both train and test inflates the scores, so keep one copy.
+    df = df.drop_duplicates(subset=["URL"])
     df = df.dropna(subset=[config.TARGET])
     return df.reset_index(drop=True)
 

@@ -16,12 +16,38 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.model_selection import StratifiedKFold, cross_validate
 
 from . import config
 
+CV_METRICS = ["accuracy", "precision", "recall", "f1", "roc_auc"]
+
+
+def cv_splitter() -> StratifiedKFold:
+    """The shared CV folds. Pass as cv= to GridSearchCV / RandomizedSearchCV."""
+    return StratifiedKFold(
+        n_splits=config.CV_FOLDS, shuffle=True, random_state=config.RANDOM_STATE
+    )
+
+
+def cv_evaluate(unfitted_model, X_train, y_train) -> dict:
+    """Cross-validated metrics on the training set (mean and std per metric).
+
+    Use this while developing and tuning. The test set (evaluate()) is only
+    for the final reported numbers.
+    """
+    scores = cross_validate(
+        unfitted_model, X_train, y_train, cv=cv_splitter(), scoring=CV_METRICS
+    )
+    out = {}
+    for m in CV_METRICS:
+        out[f"{m}_mean"] = scores[f"test_{m}"].mean()
+        out[f"{m}_std"] = scores[f"test_{m}"].std()
+    return out
+
 
 def evaluate(model, X_test, y_test) -> dict:
-    """Return all planned metrics for one fitted model."""
+    """Return all planned metrics for one fitted model (final test-set report)."""
     y_pred = model.predict(X_test)
     y_score = model.predict_proba(X_test)[:, 1]
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred, labels=[0, 1]).ravel()
