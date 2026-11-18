@@ -1,5 +1,11 @@
 # Logistic Regression – Final Test Results
 
+> **⚠️ PROVISIONAL RESULTS — NOT OFFICIAL FINAL RESULTS**
+>
+> These Logistic Regression test results are preliminary and were obtained before the project's feature selection and evaluation protocol were finalized. They are provided for development reference only and must not be presented as the official project results.
+>
+> The group has not yet finalized decisions regarding URLSimilarityIndex, near-duplicate URLs, and the train/test splitting strategy. After these decisions and the feature set are finalized, the model must be re-evaluated using the agreed evaluation protocol. The final test results will then replace or supersede these provisional results.
+
 **Project:** URLSentra – Explainable Machine Learning for Phishing URL Risk Scoring  
 **Model:** Logistic Regression  
 **Date:** 2026-11-17  
