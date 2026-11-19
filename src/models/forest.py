@@ -31,17 +31,20 @@ def build():
     Trees need no scaling, so no Pipeline is required (nothing is fitted
     before the model).
 
-    Chosen by tune() on the 20,000-row sample (original features, CV F1).
-    Six candidates tied for best CV F1 (0.99993, std 0.00015); the next group
-    was one URL worse over all folds, i.e. within noise. Among the tied ones
-    this is the cheapest (100 trees, ~0.5 s per fit) and the most regularised
-    (min_samples_leaf=8 gives smoother probabilities for the risk score).
-    Provisional: revisit after the leakage check (phase 2).
+    Chosen by tune() on the 20,000-row sample, original features without
+    URLSimilarityIndex (group decision after the phase 2 leakage check), CV F1.
+    Two candidates tied for best (CV F1 0.99956, std 0.00027): 500 trees,
+    min_samples_leaf=1, sqrt features, max_depth 20 or 30. Depth 20 is taken
+    as the more regularised of the two. The previous build() (100 trees,
+    min_samples_leaf=8) now ranks 19th of 20 (0.99788): without the leaking
+    column the forest needs full-depth leaves to use the weaker signals.
+    Leaves of size 1 give coarser probabilities, so risk.calibration_report()
+    checks whether calibration helps the risk score (notebook 04 phase 4).
     """
     return RandomForestClassifier(
-        n_estimators=100,
-        max_depth=30,
-        min_samples_leaf=8,
+        n_estimators=500,
+        max_depth=20,
+        min_samples_leaf=1,
         max_features="sqrt",
         class_weight=None,
         n_jobs=-1,
