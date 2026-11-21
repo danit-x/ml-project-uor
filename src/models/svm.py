@@ -1,9 +1,6 @@
-"""Support Vector Machine (proposal section 4.9).
+"""Linear SVM for URLSentra phishing classification (section 4.9).
 
-Owner: Dharmasiri S.O.R.
-Use a linear SVM for this large tabular dataset. The estimator and its scaler
-are calibrated within CV folds so probabilities can be used for ROC-AUC and
-phishing risk scoring without fitting preprocessing on held-out folds.
+Owner: Dharmasiri S.O.R.  In the processed target, 1 = phishing.
 """
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
@@ -14,25 +11,25 @@ from sklearn.svm import LinearSVC
 
 from .. import config, evaluate
 
-# These are safe reproducible baseline values, NOT claimed as tuned optima.
-# After tune() runs on the agreed training data, replace them with its best
-# settings and record the experiment in notebook 03.
-BEST_C = 1.0
+# Provisional best C = 0.1, selected using training-only
+# 5-fold CV on 2000 training rows (original features).
+# Retune after final feature engineering is merged.
+BEST_C = 0.1
 BEST_CLASS_WEIGHT = None
 REFIT_METRIC = "f1"
 PARAM_GRID = {
     "estimator__linearsvc__C": [0.01, 0.1, 1.0, 10.0],
-    "estimator__linearsvc__class_weight": [None, "balanced"],
 }
 
 
-def _pipeline(C: float, class_weight=None):
-    """Calibrated LinearSVC with the scaler INSIDE the calibrated estimator.
+def configured(C=BEST_C, class_weight=BEST_CLASS_WEIGHT):
+    """Unfitted calibrated linear SVM.
 
-    Scaling is fitted only on the training partition of each inner fold.
-    LinearSVC is preferable to a kernel SVC for ~235k rows and ~50 features.
+    StandardScaler is INSIDE CalibratedClassifierCV to ensure each internal
+    calibration fold fits its own scaler, not a scaler on the entire dataset.
+    Calibration provides predict_proba() for common evaluation and risk scores.
     """
-    base = make_pipeline(
+    estimator = make_pipeline(
         StandardScaler(),
         LinearSVC(
             C=C,
@@ -43,44 +40,42 @@ def _pipeline(C: float, class_weight=None):
             random_state=config.RANDOM_STATE,
         ),
     )
-    return CalibratedClassifierCV(estimator=base, method="sigmoid", cv=3)
+    return CalibratedClassifierCV(estimator=estimator, method="sigmoid", cv=3)
 
 
 def build():
-    """Return an unfitted SVM with fixed, reproducible parameters."""
-    return _pipeline(C=BEST_C, class_weight=BEST_CLASS_WEIGHT)
+    """Unfitted estimator for main.py; parameters remain fixed/reproducible."""
+    return configured(C=BEST_C, class_weight=BEST_CLASS_WEIGHT)
 
 
 def train(X, y):
-    """Fit the configured SVM and return a model supporting predict_proba()."""
+    """Fit the configured estimator; support predict() and predict_proba()."""
     return build().fit(X, y)
 
 
 def tune(X_train, y_train, n_jobs=1):
-    """Grid-search C and class weighting using shared, stratified training CV.
+    """Tune C using shared stratified training CV; never pass test rows.
 
-    Pass TRAINING data only. Start on a training subset (not on test rows).
-    Each candidate includes probability calibration; this is more costly
-    than tuning LinearSVC alone but matches the final predictor.
+    C is tuned on a modest TRAINING SUBSET first; the scoring protocol stays
+    identical to the other models. Expensive nested calibration is intentional.
     """
     search = GridSearchCV(
         build(),
-        PARAM_GRID,
-        cv=evaluate.cv_splitter(),
+        param_grid=PARAM_GRID,
         scoring=evaluate.CV_METRICS,
         refit=REFIT_METRIC,
+        cv=evaluate.cv_splitter(),
         n_jobs=n_jobs,
         error_score="raise",
     )
     return search.fit(X_train, y_train)
 
 
-def tuning_table(search, top=10):
-    """Show candidates ordered by mean phishing-class CV F1 (not test metrics)."""
-    results = pd.DataFrame(search.cv_results_)
-    cols = [
-        "params", "mean_test_f1", "std_test_f1",
-        "mean_test_recall", "mean_test_precision",
-        "mean_test_roc_auc", "mean_fit_time",
+def tuning_table(search):
+    """Return measured training CV scores, sorted by phishing-class mean F1."""
+    frame = pd.DataFrame(search.cv_results_)
+    columns = [
+        "params", "mean_test_f1", "std_test_f1", "mean_test_recall",
+        "mean_test_precision", "mean_test_roc_auc", "mean_fit_time",
     ]
-    return results.sort_values("rank_test_f1")[cols].head(top).reset_index(drop=True)
+    return frame.sort_values("rank_test_f1")[columns].reset_index(drop=True)
