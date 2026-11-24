@@ -1,53 +1,65 @@
-"""Features part: feature engineering and feature selection.
+"""URL feature engineering and training-only selection (proposal 4.6–4.7)."""
+import re
+from urllib.parse import urlsplit
 
-Owner: Madushan S.C  (proposal sections 4.6, 4.7)
-
-Keep the function names. Add your new features inside add_features() and
-list every new column name in ENGINEERED_FEATURES.
-"""
 import pandas as pd
 
 from . import config
 
-# Names of every column created in add_features().
 ENGINEERED_FEATURES = [
-    "url_digit_ratio",
-    "url_special_char_count",
+    "url_path_depth",
+    "url_longest_path_segment",
+    "url_query_field_count",
+    "url_encoded_byte_count",
 ]
+
+# Keep this in sync with the group exclusion in main.py.
+EXCLUDED_FEATURES = frozenset({"URLSimilarityIndex"})
+CORRELATION_THRESHOLD = 0.98
+ENCODED_BYTE = re.compile(r"%[0-9A-Fa-f]{2}")
+SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
+
+
+def _url_features(url: str) -> tuple[int, int, int, int]:
+    """Measure URL structure using only the supplied string."""
+    # A bare domain/path has no scheme delimiter but still has a hostname.
+    try:
+        parts = urlsplit(url if url.startswith("//") or SCHEME.match(url) else f"//{url}")
+    except ValueError:
+        return 0, 0, 0, 0
+
+    segments = [segment for segment in parts.path.split("/") if segment]
+    fields = sum(bool(field) for field in parts.query.split("&"))
+    encoded_bytes = len(ENCODED_BYTE.findall(parts.path + "?" + parts.query))
+    return len(segments), max(map(len, segments), default=0), fields, encoded_bytes
 
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Return a copy of df with the engineered features added.
-
-    This runs on the whole dataset before the train/test split, so every
-    feature must be row-wise: computed from that row alone. No counts,
-    vocabularies, means or other statistics across rows (that would leak
-    test data into training).
-
-    The two features below are examples only.
-    TODO (owner): replace / extend with meaningful URL features, e.g. counts of
-    particular characters, ratios, subdomain depth, combinations of existing
-    attributes. Justify each one in the notebook.
-    """
-    df = df.copy()
-    url = df["URL"].astype(str)
-    length = url.str.len().clip(lower=1)
-
-    df["url_digit_ratio"] = url.str.count(r"\d") / length
-    df["url_special_char_count"] = url.str.count(r"[^A-Za-z0-9]")
-    return df
+    """Add numeric features without changing input rows, index or raw URLs."""
+    url = df["URL"].astype("string").fillna("").str.strip()
+    metrics = pd.DataFrame(
+        url.map(_url_features).tolist(), index=df.index,
+        columns=ENGINEERED_FEATURES, dtype="int64",
+    )
+    return df.assign(**metrics)
 
 
 def select_features(df: pd.DataFrame, feature_cols: list) -> list:
-    """Return the list of features to keep for modelling.
+    """Drop excluded, constant and near-duplicate numeric columns on train rows.
 
-    main.py passes the training rows only (target column included), so
-    correlation / importance analysis here never sees the test set. Keep it
-    that way when calling it from a notebook: pass df.loc[X_train.index].
-
-    TODO (owner): remove redundant, irrelevant or highly correlated features
-    (correlation analysis, importance scores, etc.) and justify the choice.
-    Also decide with the group what to do with features that almost reveal
-    the label on their own (check URLSimilarityIndex).
+    Retain the first column in each redundant pair. Callers put original
+    columns first so engineered features must contribute distinct information.
+    The rule uses no labels and does not inspect the holdout.
     """
-    return list(feature_cols)
+    excluded = EXCLUDED_FEATURES | {config.TARGET} | set(config.TEXT_COLUMNS)
+    candidates = [col for col in dict.fromkeys(feature_cols) if col not in excluded]
+    numeric = df[candidates].select_dtypes(include="number")
+    varying = numeric.loc[:, numeric.nunique() > 1]
+    correlation = varying.corr().abs()
+    selected = []
+    for col in varying.columns:
+        if not correlation.loc[col, selected].ge(CORRELATION_THRESHOLD).any():
+            selected.append(col)
+    if not selected:
+        raise ValueError("Feature selection found no eligible varying numeric columns.")
+    return selected
