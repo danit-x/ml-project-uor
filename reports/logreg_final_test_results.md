@@ -1,5 +1,10 @@
 # Logistic Regression – Final Test Results
 
+> **Superseded (2026-11-24).** These numbers come from the earlier protocol (random split, 50 original
+> features including `URLSimilarityIndex` and page content). The current Logistic Regression results under the
+> agreed protocol (group-aware split, grouped CV, `url_engineered`, C = 1000) are in
+> `reports/official_comparison.csv`, written by `python main.py`. This file is kept as history only.
+
 > **⚠️ PROVISIONAL RESULTS — NOT OFFICIAL FINAL RESULTS**
 >
 > These Logistic Regression test results are preliminary and were obtained before the project's feature selection and evaluation protocol were finalized. They are provided for development reference only and must not be presented as the official project results.
