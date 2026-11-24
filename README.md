@@ -6,20 +6,23 @@ We classify URLs as phishing or legitimate with four classical models, compare
 them before and after feature engineering, turn the phishing probability into a
 risk score, and explain the predictions.
 
-> **Status on 2026-11-19:** work in progress. Data cleaning is done (group
-> decisions on near-duplicate URLs and the split method are pending).
-> `URLSimilarityIndex` is now dropped (group decision, label leakage). Logistic
-> Regression and Random Forest are tuned, but their results are **provisional**
-> (LR was tuned before the drop; RF was re-tuned without it on a 20k sample).
-> Risk scoring (calibration, risk bands) and explainability (SHAP, LR coefficients,
-> single-URL explanations) are implemented and run from `main.py` and nb04, on a
-> 20k sample so far (**provisional**). Decision Tree: **initial scaffold exists;
-> Member 3 implementation, tuning and evaluation pending**. SVM: **initial scaffold
-> exists; Member 4 implementation, tuning and evaluation pending**. Feature
-> engineering is **not finished yet**. Every model currently scores close to
-> 1.0, which we treat as a warning sign of data leakage, **not** as a result.
-> **There are no official final results yet.** See [Current progress](#15-current-progress)
-> and [Data leakage and known limitations](#14-data-leakage-and-known-limitations).
+> **Status for the progress evaluation (2026-11-24).** Older dated notes further down are kept as history;
+> where they differ, this block and section 15 are current.
+> - **Protocol:** near-duplicate URLs share a URL group (`data.url_group_key`); the train/test split is group-aware and
+>   stratified, and every model is tuned and cross-validated on the **same 5 grouped folds** of the training rows only.
+>   `URLSimilarityIndex` is excluded from every feature set. Primary feature set: `url_engineered` (23 URL-only
+>   features); `url_base` and `extended` (+ `IsHTTPS` + page content) are secondary comparisons.
+> - **Official models:** Logistic Regression (C = 1000, L2/lbfgs, tuned on the full training split; C is at the upper
+>   edge of the searched range), Decision Tree (max_depth 20, complexity review), Random Forest (300 trees, depth 20,
+>   max_features 0.5; bounded search on a 50,000-row group-preserving training subset). **SVM is provisional** (C from
+>   an earlier ungrouped 2,000-row tuning) and reported separately.
+> - **Results:** `python main.py` (full data) writes `reports/official_comparison.csv` (grouped CV + held-out test for
+>   the three official models), `reports/results.csv` (all models and feature sets, with a `protocol` column),
+>   `reports/format_baseline.csv` and `reports/format_controlled.csv` (collection-bias reference), and
+>   `reports/risk_bands.csv`. Progress-evaluation drafts: `docs/progress_evaluation/`.
+> - **Main limitation:** every legitimate PhiUSIIL URL is a bare `https://www.<domain>` homepage (about 1 % of phishing
+>   URLs are), so URL-only scores near 0.99 largely measure the dataset's collection format. They are always shown next
+>   to the fixed rule "not a bare https://www homepage → phishing", and we do **not** claim real-world generalisation.
 
 **How to read status labels in this file**
 
@@ -91,7 +94,7 @@ proposal document.
 
 1. Inspect the dataset and document its structure and class balance (4.2, 4.3).
 2. Clean the data: duplicates, missing values, inconsistent labels (4.4).
-3. Preprocess the data and create one shared, stratified train/test split (4.5, 4.8).
+3. Preprocess the data and create one shared, stratified, URL-group-aware train/test split (4.5, 4.8).
 4. Engineer new URL-based features and select a useful feature subset (4.6, 4.7).
 5. Train and tune Logistic Regression, Decision Tree, Random Forest and SVM (4.9).
 6. Evaluate all models with the same metrics: accuracy, precision, recall, F1,
@@ -114,7 +117,7 @@ proposal document.
 | Size (after `clean()`) | 235,370 rows: 100,520 phishing, 134,850 legitimate |
 | Model input | 50 numeric "original" features |
 | Not used as model input | `FILENAME`, `URL`, `Domain`, `TLD`, `Title` (`config.TEXT_COLUMNS`) and `label` |
-| Shared split | 80 % train (188,296 rows) / 20 % test (47,074 rows), stratified, `RANDOM_STATE = 42` |
+| Shared split | 80 % train (188,297 rows) / 20 % test (47,073 rows): one fold of `StratifiedGroupKFold(5, shuffle=True, RANDOM_STATE = 42)` over normalized URL groups (changed 2026-11-24; previously 188,296 / 47,074 with a random stratified split) |
 
 The row counts above are **Verified** (notebook 01, sections 2 and 3, and an
 independent re-check on 2026-11-17).
@@ -189,6 +192,7 @@ ml-project-uor/
 │   └── *.csv                 result tables
 ├── saved_models/             fitted models (.joblib, not in git)
 ├── main.py                   runs the whole pipeline end to end
+├── tune_models.py            grouped training-only tuning of LR, DT, RF (writes reports/tuning/)
 ├── requirements.txt          pinned Python packages
 ├── CLAUDE.md                 project rules for the Claude Code assistant
 ├── .gitignore                keeps data, models and sample results out of git
@@ -221,25 +225,23 @@ run it on both the original and the engineered features.
 | 3 | Madushan S.C | Feature Engineering + Decision Tree | Decision Tree | Feature engineering, feature selection | 4.6, 4.7 |
 | 4 | Dharmasiri S.O.R | Evaluation + SVM | SVM | Common evaluation, model comparison, before/after feature engineering comparison | 4.10, 4.12 |
 
-Members 3 and 4: the work is **assigned**. Implementation progress is **awaiting
-confirmation**, because the repository has no commits or code changes from them yet
-(checked on 2026-11-18). Update this when their first commits are pushed.
+Members 3 and 4 committed their work on 2026-11-21 (Decision Tree: `7973c24`, Madushan S.C;
+SVM and shared evaluation utilities: `e6cbe11`, `4392061`, `643c94e`, Dharmasiri S.O.R; merged as PR #7
+`f022c97` and the integration merge `88804ba`). Since 2026-11-24, Madushanka D.M.C has been finishing the
+remaining integration, retuning and evaluation work for all four parts on `integration/decision-tree-corrections`
+(uncommitted working tree at the time of writing); the original commits keep their authors.
 
 ### Models for the progress evaluation
 
-All four models stay in the project. **Proposed** for the progress evaluation:
-Logistic Regression, Random Forest and Decision Tree.
+The **three official models** are Logistic Regression, Decision Tree and Random Forest. The SVM stays in the
+project as a supplementary, **provisional** model.
 
-| Model | Owner | Proposed for progress evaluation | Status | Evidence |
+| Model | Owner | Official for progress evaluation | Status | Frozen configuration and evidence |
 |---|---|---|---|---|
-| Logistic Regression | Member 1 | Yes | Provisional | Tuned in `src/models/logreg.py`, nb01 §6 (commit `e86f144`) |
-| Random Forest | Member 2 | Yes | Provisional | Re-tuned without `URLSimilarityIndex` in `src/models/forest.py` (20k sample), nb04 phase 3 (commit `2569c27`, PR #4) |
-| Decision Tree | Member 3 | Yes | Initial scaffold exists; Member 3 implementation, tuning and evaluation pending | `src/models/tree.py` holds the untuned scaffold baseline (commit `165eead`). No tuning commits yet. |
-| SVM | Member 4 | No | Initial scaffold exists; Member 4 implementation, tuning and evaluation pending | `src/models/svm.py` holds the untuned scaffold baseline (commit `165eead`). No tuning commits yet. |
-
-Decision Tree and SVM keep this status until their tuned implementation and
-evaluation are committed and checked. The overall progress of Members 3 and 4
-stays **Awaiting confirmation** until then.
+| Logistic Regression | Member 1 | Yes | Tuned (grouped CV, full training split) | L2/lbfgs, C = 1000 (one-SE rule; **upper edge** of the searched range). `src/models/logreg.py`, `reports/tuning/lr_followup_search.csv`, nb01 §6 |
+| Decision Tree | Member 3 | Yes | Tuned (grouped CV, full training split) + complexity review | max_depth 20, min_samples_leaf 1. `src/models/tree.py`, `reports/tuning/dt_complexity.csv`, nb02 |
+| Random Forest | Member 2 | Yes | Tuned with a **bounded** grouped search on a 50,000-row group-preserving training subset | 300 trees, max_depth 20, min_samples_leaf 1, max_features 0.5. `src/models/forest.py`, `reports/tuning/rf_subset_search.csv`, nb04 Part A |
+| SVM | Member 4 | No (supplementary) | **Provisional**: C = 0.1 from the earlier ungrouped 2,000-row tuning | `src/models/svm.py`, nb03; reported with `protocol = provisional` in `reports/results.csv` |
 
 ---
 
@@ -350,32 +352,34 @@ Run these from the repository root with the virtual environment activated.
 | Command | What it does | Writes | Time |
 |---|---|---|---|
 | `python main.py --sample 20000` | Quick end-to-end check on a random 20,000-row sample | `reports/results_sample_20000*.csv` (not committed), `reports/figures/shap_summary_sample_20000.png` (do not commit), `saved_models/*.joblib` | about 80 seconds (about 10 s with `--explain-rows 0`), measured 2026-11-19 |
-| `python main.py` | Full dataset, all four models, original and engineered features | `reports/results.csv`, `reports/risk_scores.csv`, `reports/shap_importance.csv`, `reports/figures/shap_summary.png`, `saved_models/*.joblib` (8 files) | not measured yet; the SVM is the slowest |
+| `python main.py` | Full dataset, all four models, the three feature sets (official comparison = LR/DT/RF on `url_engineered`) | `reports/results.csv`, `reports/cv_results.csv`, `reports/official_comparison.csv`, `reports/format_baseline.csv`, `reports/format_controlled.csv`, `reports/risk_bands.csv`, `reports/risk_scores.csv`, `reports/shap_importance.csv`, `reports/figures/shap_summary.png`, `saved_models/*.joblib` (13 files) + `manifest.json` | about 53 min on an 8-core, 8 GB laptop (2026-11-24; grouped CV of the forests dominates; `--skip-cv` skips it) |
 | `python main.py --data <file>` | Same as above with a different CSV path | as above | |
+| `python tune_models.py` | Grouped 5-fold tuning of LR, DT (+ complexity review) and RF on the full training split, `url_engineered`; per-fold feature-selection check | `reports/tuning/*.csv`, `reports/tuning/tuning_summary.json` | see `seconds` in the summary JSON (RF search dominates) |
+| `python tune_models.py --parts lr_followup rf_subset --time-budget 1500` | The bounded searches used for the progress evaluation: LR L2/lbfgs C 0.001–1000 on the full training split; RF 8 candidates on a 50,000-row group-preserving training subset. Each stops collecting results after the time budget and keeps partial results | `reports/tuning/lr_followup_*.csv`, `reports/tuning/rf_subset_search*.csv` | about 5 min each (measured 2026-11-24) |
+| `python demo.py` | Risk score, band, prediction and top SHAP contributions for three held-out test URLs (`--url "<test URL>"` for one URL; arbitrary URLs are refused) | nothing (reads `saved_models/`) | about 1–2 min (data loading) |
 | `python main.py --explain-rows N` | Explain the first N test URLs with SHAP (default 500; 0 skips risk scoring and SHAP) | as above | SHAP takes about 30 s per 1,000 URLs |
 
-**What `main.py` does:**
+**What `main.py` does** (details in its module docstring):
 
-1. Loads and cleans the data (`data.load_clean_data()`).
-2. Drops the features in `main.DROPPED_FEATURES` (`URLSimilarityIndex`, group decision)
-   and builds two feature sets: `original` (49 features) and `engineered`
-   (`features.add_features()` then `features.select_features()` on **training rows only**).
-3. Splits with `data.split()`, then trains every model in `src/models/__init__.py`.
-4. Evaluates every model on the test split with `evaluate.evaluate()`, plus the
-   Brier score of its phishing probability.
-5. Saves the comparison table and the fitted models.
-6. Risk scoring and explanations (`risk_and_explain()`, Random Forest on original
-   features): calibrates the forest on training rows (`risk.calibrate()`, sigmoid),
-   prints the test-set Brier score and risk-band table, and saves SHAP importance and
-   per-URL risk scores with their top three features for the first `--explain-rows`
-   test URLs.
+1. Loads and cleans the data; builds URL groups and the group-aware split (0 groups shared by train and test).
+2. Builds `url_base`, `url_engineered` (primary) and `extended` on **training rows only**
+   (`URLSimilarityIndex` is in none).
+3. Grouped 5-fold CV of LR, DT and RF on every set (identical folds; feature selection refitted per fold)
+   → `reports/cv_results.csv`.
+4. Fits every model's frozen `build()` on the training rows and evaluates it once on the held-out rows
+   → `reports/results.csv` (with a `protocol` column) and `reports/official_comparison.csv`.
+5. Scores the fixed format rule on the same folds and test rows (`reports/format_baseline.csv`) and splits the
+   held-out results by URL format (`reports/format_controlled.csv`).
+6. Calibrates the Random Forest on training rows (grouped folds, sigmoid) → `reports/risk_bands.csv`, SHAP for the
+   first `--explain-rows` test URLs → `reports/shap_importance.csv`, `reports/risk_scores.csv`; saves the models and
+   `saved_models/manifest.json` for `demo.py`.
 
 **Always run the sample first.** If `--sample 20000` fails, fix it before trying
 the full run.
 
 > **Sample results are not official results.** A `--sample` run splits the
 > 20,000-row sample into its own 16,000 / 4,000 train/test sets. That is **not**
-> the official 47,074-row test set. Use sample runs only to check that the code
+> the official 47,073-row test set. Use sample runs only to check that the code
 > works. Never put sample numbers in the report or slides as model performance.
 
 > **The full run touches the test set.** `python main.py` evaluates on the
@@ -483,22 +487,20 @@ for leaking features before you report it (see section 14).
 
 ### Evaluation protocol
 
-These steps happen in this order. The protocol is **not frozen yet**: several
-parts wait for group decisions (section 15), and nothing below claims a decision
-has been made.
+These steps happen in this order. Status updated 2026-11-24 for the progress evaluation.
 
-| # | Step | Rule | Current state (checked 2026-11-18) |
+| # | Step | Rule | Current state (2026-11-24) |
 |---|---|---|---|
-| 1 | Near-duplicate URL handling | Decide before any final run, because it changes everyone's data. Handle it in `clean()` or `split()` so all models see the same rows. | **Unresolved.** 1,165 near-duplicate pairs are kept; 392 pairs cross the train/test split (nb01 §4). |
-| 2 | Domain-grouped vs random split | Decide one split for everyone. `data.split()` stays the only way to split. | **Unresolved.** Current code uses a random stratified split; about 4 % of test URLs share a domain with a training URL (nb04, 20k sample). |
-| 3 | Feature selection and feature freeze | Select features on training rows only (`select_features(df.loc[X_train.index], ...)`). Then freeze the feature list for both feature sets (`original`, `engineered`) before final tuning. | **Pending.** `URLSimilarityIndex` is dropped (decided 2026-11-19), applied in `main.DROPPED_FEATURES` (both feature sets; the `original` set does not pass through `select_features()`). `select_features()` still returns every feature. Feature freeze waits for Member 3's features and the decisions on `IsHTTPS` and page features. |
-| 4 | Tuning and model selection on training data | Tune hyperparameters and compare models with cross-validation on the training split only (`evaluate.cv_splitter()`). Re-tune after the feature freeze. | LR tuned on the full training split (with `URLSimilarityIndex`, so needs re-tuning); RF re-tuned without it on a 20k training sample; DT and SVM not tuned yet. All need re-tuning after the freeze. |
-| 5 | Final test-set usage | Run `evaluate.evaluate()` on the official 47,074-row test set **once per model**, after steps 1 to 4 are frozen. Nothing is changed after that. | **Not done.** `RUN_FINAL_TEST = False` in nb01 and nb04; nb02 and nb03 have no guard yet. The existing LR test report is provisional (section 15). |
+| 1 | Near-duplicate URL handling | Decide before any final run, because it changes everyone's data. Handle it in `clean()` or `split()` so all models see the same rows. | **Done 2026-11-24.** Rows are kept; `data.url_group_key()` groups them (scheme, `www.`, hostname case, trailing `/`; path and query kept) and `data.split()` / `evaluate.cv_folds()` keep each group on one side. 231,779 groups, 3,287 with several rows; 43 label-conflict groups (86 rows) kept as label noise (`data.conflicting_label_groups()`). |
+| 2 | Domain-grouped vs random split | Decide one split for everyone. `data.split()` stays the only way to split. | **Group decision 2026-11-24:** group-aware split on the normalised URL (`url_group_key`). **Domain-level grouping is deferred for this progress evaluation, not permanently rejected:** it was not evaluated at this stage, and the remaining domain overlap between train and test (about 4 % of test URLs, measured on a 20k sample under the old random split) is a documented limitation to revisit for the final report. |
+| 3 | Feature selection and feature freeze | Select features on training rows only (`select_features(df.loc[X_train.index], ...)`). Then freeze the feature list for both feature sets (`original`, `engineered`) before final tuning. | **Done 2026-11-24.** `features.build_feature_sets()` (training rows only) builds `url_base` (20), `url_engineered` (23, primary) and `extended` (52). `URLSimilarityIndex` is excluded from all (`features.EXCLUDED_FEATURES`); `url_encoded_byte_count` is removed as redundant (\|r\| 0.994 with `NoOfAmpersandInURL`). |
+| 4 | Tuning and model selection on training data | Tune hyperparameters and compare models with cross-validation on the training split only. Re-tune after the feature freeze. | **Done 2026-11-24.** Grouped CV (`evaluate.cv_folds`) on `url_engineered`: LR C = 1000 (full training split, upper edge), DT max_depth 20 (full training split, complexity review), RF bounded search on a 50,000-row group-preserving subset. SVM provisional. |
+| 5 | Final test-set usage | Run `evaluate.evaluate()` on the official 47,073-row test set **once per model**, after steps 1 to 4 are frozen. Nothing is changed after that. | **Done 2026-11-24** by `python main.py` (frozen `build()` of every model; `reports/official_comparison.csv`). The 2026-11-17 LR test report is superseded. |
 
 **Feature and leakage decisions:** `URLSimilarityIndex` is dropped (group decision,
-2026-11-19). `IsHTTPS` and the page features are still unresolved (see section 14
-and the pending group decisions in section 15); they stay in the shared feature
-list as a temporary default, not as a group choice.
+2026-11-19). `IsHTTPS` and the page features are excluded from the primary URL-only
+sets and used only in the secondary `extended` set (group decision, 2026-11-24; see
+section 14 and the decision table in section 15).
 
 **Reproducibility.** Every number in the report must be regenerated by committed
 code. Do not type metrics into slides or reports by hand from memory. Save tables
@@ -592,8 +594,8 @@ and notebook 04 phase 2) used training rows only. The findings are below.
 | With **URL features only**, without `URLSimilarityIndex` and `IsHTTPS`, Random Forest CV F1 drops to about 0.96. This is closer to how hard the real task is. | Harder, more honest variant | nb04 ablation (20k sample) | Provisional |
 | After the drop, the re-tuned Random Forest's SHAP values put about 74 % of the weight on page features (top: `LineOfCode`, `NoOfSelfRef`, `NoOfExternalRef`, `NoOfImage`, then `IsHTTPS`). LR relies most on `IsHTTPS` and URL character ratios instead. | Confirms the page-feature collection bias in the forest | nb04 phase 5 (20k sample) | Provisional |
 | 425 URLs appear twice. The copies always have the same label but **different feature values** (for example `URLLength`). `clean()` keeps the first copy. | Data quality | nb01 §3 | Done (required by the project rules in `CLAUDE.md`) |
-| 1,165 near-duplicate URL pairs (differ only by trailing `/`). 392 pairs fall on both sides of the train/test split. One pair has conflicting labels (`https://www.education.gouv.fr/` phishing vs `https://www.education.gouv.fr` legitimate). | Possible leakage and label noise | nb01 §4 | **Group decision pending.** Kept in the data for now. |
-| About 4 % of test URLs share a domain with a training URL. | Mild overlap | nb04 (20k sample) | Optional: split grouped by domain (group decision) |
+| 1,165 near-duplicate URL pairs (differ only by trailing `/`). 392 pairs fall on both sides of the train/test split. One pair has conflicting labels (`https://www.education.gouv.fr/` phishing vs `https://www.education.gouv.fr` legitimate). | Possible leakage and label noise | nb01 §4 | **Group decision 2026-11-24:** kept, grouped, never split across train/test or CV folds. |
+| About 4 % of test URLs share a domain with a training URL. | Mild overlap | nb04 (20k sample, old random split) | **Deferred for the progress evaluation** (not permanently rejected): domain-level grouping to be revisited for the final report; documented limitation |
 
 ### How we protect against leakage in the code
 
@@ -609,45 +611,48 @@ and notebook 04 phase 2) used training rows only. The findings are below.
 
 ### Known limitations
 
-- **Feature engineering is a placeholder.** `add_features()` contains only two
-  example features (`url_digit_ratio`, `url_special_char_count`) and
-  `select_features()` returns every feature unchanged. The current "engineered"
-  results are therefore 50 original + 2 example features, **not** a real
-  before/after comparison.
-- **Risk scoring is checked on a 20k sample only.** Sigmoid calibration was chosen
-  out-of-fold on training rows (Brier score 0.00131 to 0.00043, nb04 phase 4) and the
-  0.30 / 0.70 bands match their names there. Trade-off: with calibration, 4 phishing
-  URLs fall in the Low band (none without it). The Low / Medium / High bands are not
-  in proposal 4.11, so the group must confirm them. Both choices must be re-checked
-  on the full training set.
-- **Explainability is shown for the Random Forest and LR only.** SHAP for the forest
-  and coefficient contributions for LR (nb04 phase 5). The LR view is provisional
-  until LR is re-tuned without `URLSimilarityIndex`. Decision Tree and SVM are
-  supported by `explain.contributions()` but not shown until they are tuned.
-- **Decision Tree and SVM use untuned default settings.** The fully grown tree
-  gives probabilities of almost only 0 or 1, so its ROC-AUC and risk score are not
-  meaningful yet. The SVM is a linear SVM; a kernel SVM is too slow for the full data.
-- **Random Forest was tuned on a 20,000-row sample only** (re-tuned without
-  `URLSimilarityIndex`), and its settings are provisional until the feature list
-  is frozen and they are checked on the full training set.
-- **No full-dataset results yet.** `reports/results.csv` does not exist, and the
-  full `main.py` run time has not been measured.
-- **Page-feature collection bias.** Page features such as `LineOfCode`,
-  `NoOfExternalRef` and `NoOfImage` separate the classes almost perfectly on
-  their own (single-feature ROC-AUC 0.96 to 0.99 on training rows, nb01 §7 and
-  nb04 phase 2). This most likely reflects how the pages were collected (many
-  phishing pages were bare or already taken down), not a property a real-world
-  detector could rely on. The group has **not** decided whether to retain or
-  exclude these features (section 15).
-- **Dataset scope.** One dataset from one collection period. High scores here do
-  not prove the models would work on new, real-world URLs.
+Current as of 2026-11-24 (progress evaluation). The superseded list of 2026-11-19 is in the git history.
+
+- **URL-format collection bias (main limitation).** Every legitimate URL is a bare `https://www.<domain>` homepage;
+  about 1 % of phishing URLs are. The fixed rule "not a bare https://www homepage → phishing" (no learning) scores
+  close to the URL-only models (`reports/format_baseline.csv`, same grouped folds and test rows). The models therefore
+  mostly learn the collection format; `reports/format_controlled.csv` shows how they do on bare homepages, where that
+  cue is absent. No claim of real-world generalisation is made.
+- **Page-content and `IsHTTPS` collection bias.** `IsHTTPS` = 1 for every legitimate URL and page counts
+  (`LineOfCode`, `NoOfExternalRef`, ...) nearly separate the classes (phishing pages were often bare or taken down).
+  They are used only in the secondary `extended` set, whose near-perfect scores are a warning, not a result.
+- **Logistic Regression C at the edge.** C = 1000 is the largest value searched; F1 still rose slightly with C
+  (about one SE per step from C = 30). L1 models were not evaluated (liblinear did not converge at C = 0.1).
+- **Random Forest tuned on a subset.** The bounded search used a 50,000-row group-preserving subset of the training
+  rows; only the chosen forest was trained and cross-validated on the full training split.
+- **Decision Tree size.** The frozen tree (depth 20, about 1,300 leaves) cannot be read leaf by leaf; it is explained
+  by its top levels and importances. A readable depth-4 tree loses about 0.17 F1.
+- **SVM is provisional** (C from the earlier ungrouped 2,000-row tuning, not retuned with grouped CV).
+- **Calibration check.** The served model, `risk.calibrate()`, uses the grouped folds. The method choice (sigmoid)
+  was re-checked only on a 20,000-row development sample, and the nested comparison in `risk.calibration_report()`
+  calibrates inside each grouped outer fold with the legacy **ungrouped** inner splitter. On the held-out rows, 108
+  phishing URLs fall in the Low band and 61 legitimate URLs in High (`reports/risk_bands.csv`).
+- **Domain-level grouping deferred.** Near-duplicate URLs are grouped, but URLs from the same domain can still be on
+  both sides of the split (about 4 % of test URLs on an earlier 20k-sample check); deferred, not rejected.
+- **Demo scope.** `demo.py` scores only held-out PhiUSIIL test URLs: several inputs (`TLDLegitimateProb`,
+  `URLCharProb`, ...) come from the dataset authors' feature extractor, which this project does not reproduce.
+- **Dataset scope.** One dataset from one collection period.
 
 ---
 
 ## 15. Current progress
 
-Last updated: 2026-11-19. Update this section in every pull request that changes
-the status of a task.
+**Current summary (2026-11-24, progress evaluation).** Done on `integration/decision-tree-corrections`
+(uncommitted working tree): URL grouping + group-aware split + grouped CV; the three agreed feature sets with
+per-fold feature selection; LR, DT and RF tuned with grouped CV and frozen (see section 6); full-data `main.py`
+run with grouped CV and held-out test for all models; format reference rule and format-controlled breakdown;
+grouped calibration, risk bands, SHAP and `demo.py`; notebooks 01–04 updated (old results kept as labelled
+history); 64 unit tests (`python -m unittest discover -s tests -t .`). Remaining: SVM grouped retune; final
+report. Future work: evaluation on an independently collected dataset (the URL-format collection bias is reported
+as the main limitation). Progress-evaluation drafts: `docs/progress_evaluation/`.
+
+The tables below are the history up to 2026-11-19 (last updated then); where they differ, the summary above
+is current.
 
 ### Completed
 
@@ -725,18 +730,20 @@ as Danith Thanthrige.
 
 ### Pending group decisions
 
-Only `URLSimilarityIndex` is decided. For the others, the options are for
-discussion only, and the current code behaviour (for example, keeping `IsHTTPS`)
-is a temporary default, not a group choice.
+**Group decision** rows were agreed by the group. **Project-owner decision** rows were taken by Madushanka D.M.C on
+2026-11-24 for the progress evaluation and still need group confirmation. **Evidence-based finding** rows record a
+measured fact, not a vote. **Deferred** rows stay open.
 
 | Decision | Options under discussion | Affects | Status |
 |---|---|---|---|
-| `URLSimilarityIndex` | keep / drop in `select_features()` / report both | everyone's results | **Decided 2026-11-19: drop.** Applied in `main.DROPPED_FEATURES` for both feature sets. |
-| Risk bands and calibration | keep the Low / Medium / High bands (0.30 / 0.70; not in proposal 4.11) or report the score only; sigmoid-calibrated score (better Brier score, 4 phishing URLs in Low on the 20k sample) or raw score (no phishing in Low) | risk score, demo | Unresolved (current code: bands kept, sigmoid) |
-| Near-duplicate URLs | (a) keep as now; (b) normalise only safe cases and deduplicate; (c) group-aware split; (d) drop only the conflicting pair (details in nb01 §4) | `clean()` or `split()`, everyone's data | Unresolved |
-| Domain-grouped splitting | keep the random split / split grouped by domain | `split()`, everyone's data | Unresolved |
-| `IsHTTPS` | keep / drop / keep and also report a URL-only result | everyone's results | Unresolved |
-| Page features with collection bias (`LineOfCode`, `NoOfExternalRef`, `NoOfImage`, ...) | retain / exclude / retain and also report a URL-only result | everyone's results, feature freeze | Unresolved |
+| `URLSimilarityIndex` | keep / drop in `select_features()` / report both | everyone's results | **Group decision 2026-11-19: drop.** Applied in `main.DROPPED_FEATURES` for both feature sets. |
+| Risk bands and calibration | keep the Low / Medium / High bands (0.30 / 0.70; not in proposal 4.11) or report the score only; sigmoid-calibrated score (better Brier score, 4 phishing URLs in Low on the 20k sample) or raw score (no phishing in Low) | risk score, demo | **Project-owner decision 2026-11-24, group confirmation pending:** keep the sigmoid-calibrated score and the 0.30 / 0.70 bands. Sigmoid was re-checked on a 20,000-row development sample (outer folds grouped; the internal calibration CV folds of that check were ungrouped). Disclose that 108 held-out phishing URLs fall in Low and 61 legitimate URLs in High (`reports/risk_bands.csv`) |
+| Near-duplicate URLs | (a) keep as now; (b) normalise only safe cases and deduplicate; (c) group-aware split; (d) drop only the conflicting pair (details in nb01 §4) | `clean()` or `split()`, everyone's data | **Group decision 2026-11-24: (c)** group-aware split and CV with the agreed normalization; conflicting groups kept |
+| Domain-grouped splitting | keep the URL-group split / split grouped by domain | `split()`, everyone's data | **Deferred for this progress evaluation, not permanently rejected.** The current split groups near-duplicate URLs (group decision above); domain-level grouping is to be revisited for the final report |
+| `IsHTTPS` | keep / drop / keep and also report a URL-only result | everyone's results | **Group decision 2026-11-24:** out of the primary URL-only sets; only in `extended` |
+| Page features with collection bias (`LineOfCode`, `NoOfExternalRef`, `NoOfImage`, ...) | retain / exclude / retain and also report a URL-only result | everyone's results, feature freeze | **Group decision 2026-11-24:** out of the primary URL-only sets; only in `extended` |
+| Engineered features | keep `url_engineered` as primary / switch to `url_base` | primary results | **Project-owner decision 2026-11-24, group confirmation pending:** keep `url_engineered` as primary; report that the engineered features gave no measurable improvement |
+| URL-format collection bias | report as limitation / format-controlled evaluation / second dataset | interpretation of all URL-only results | **Evidence-based finding (not a group vote), 2026-11-24:** reported as the main limitation, shown with `reports/format_baseline.csv` and `format_controlled.csv`; independent-dataset evaluation is future work |
 
 ---
 
@@ -746,14 +753,14 @@ is a temporary default, not a group choice.
 
 | Criterion | What we must show | Owner(s) | Status |
 |---|---|---|---|
-| Problem analysis | Problem statement, objectives, dataset description, class balance | Madushanka D.M.C (data), all (problem) | Partial: this README and nb01; class-balance figure missing |
-| Data preprocessing | Cleaning steps with evidence and reasons, shared split | Madushanka D.M.C | Done (two group decisions pending) |
-| Feature engineering | New features with justification, selection method, before/after effect | Madushan S.C | Pending (placeholder only) |
-| Model selection and implementation | Why each model, tuning method and chosen hyperparameters | Each model owner | Proposed models: LR, RF, DT. LR and RF: Provisional. DT: initial scaffold exists; Member 3 implementation, tuning and evaluation pending. SVM: initial scaffold exists; Member 4 implementation, tuning and evaluation pending. |
-| Model evaluation | Same metrics for all models, comparison table and plots, leakage discussion | Dharmasiri S.O.R (comparison), each owner (own model) | Partial: metrics and CV exist; comparison and plots pending |
-| Demonstration | Live run of the pipeline and notebook sections | Thanthrige D.P (`main.py`), each owner | Partial: `main.py --sample 20000` runs end to end with risk scores and SHAP; nb04 phases 4 and 5 show calibration, bands and single-URL explanations (20k sample) |
-| Viva | Every member explains and defends their own part | Everyone | Each member prepares their part |
-| Individual contribution | Visible commits and pull requests from every member | Everyone | Member 1 (Madushanka D.M.C): PRs #2 and #3 merged (`724370e`, `f808569`). Member 2 (Thanthrige D.P): PR #1 merged as `7242dc4`, PR #4 merged as `c372c82`. Members 3 and 4: assigned, awaiting confirmation. |
+| Problem analysis | Problem statement, objectives, dataset description, class balance | Madushanka D.M.C (data), all (problem) | Done: README §1–3, nb01, `docs/progress_evaluation/` |
+| Data preprocessing | Cleaning steps with evidence and reasons, shared split | Madushanka D.M.C | Done: cleaning, URL groups, group-aware split, grouped CV (nb01 §3–4b, `src/data.py`, tests) |
+| Feature engineering | New features with justification, selection method, before/after effect | Madushan S.C | Done: 4 engineered URL features (3 kept), redundancy filter refitted per fold, `url_base` vs `url_engineered` comparison (nb02, `reports/cv_results.csv`) |
+| Model selection and implementation | Why each model, tuning method and chosen hyperparameters | Each model owner | Done for LR, DT, RF (grouped CV, one-SE rule, see §6); SVM provisional |
+| Model evaluation | Same metrics for all models, comparison table and plots, leakage discussion | Dharmasiri S.O.R (comparison), each owner (own model) | Done: `reports/official_comparison.csv`, `reports/results.csv`, format baseline and format-controlled breakdown |
+| Demonstration | Live run of the pipeline and notebook sections | Thanthrige D.P (`main.py`), each owner | Ready: `python demo.py` (held-out URLs: score, band, SHAP), nb04 Part A |
+| Viva | Every member explains and defends their own part | Everyone | Notes: `docs/progress_evaluation/presentation_outline.md` |
+| Individual contribution | Visible commits and pull requests from every member | Everyone | Original commits from all four members are preserved (see the progress document). The 2026-11-24 integration and grouped-CV retuning across all modules was done by Madushanka D.M.C and is not yet committed. Members still have to confirm the contribution table |
 
 ### Evaluation logistics
 
