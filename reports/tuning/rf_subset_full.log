@@ -1,0 +1,69 @@
+Training rows 188,297 | url_engineered: 23 features | folds [37660, 37659, 37659, 37660, 37659] | prep 151 s
+
+=== rf_subset ===
+RF subset: 50,000 training rows, 49,229 groups, phishing share 0.4270 (full training 0.4271); folds [10000, 10000, 10001, 10000, 9999]
+[1/8] {'max_depth': None, 'min_samples_leaf': 1, 'max_features': 'sqrt'} | f1 0.99026 ± 0.00165 | leaves/tree 1214 | 27 s | elapsed 27 s
+[2/8] {'max_depth': None, 'min_samples_leaf': 1, 'max_features': 0.5} | f1 0.99096 ± 0.00149 | leaves/tree 714 | 45 s | elapsed 73 s
+[3/8] {'max_depth': None, 'min_samples_leaf': 4, 'max_features': 'sqrt'} | f1 0.98445 ± 0.00254 | leaves/tree 662 | 26 s | elapsed 99 s
+[4/8] {'max_depth': None, 'min_samples_leaf': 4, 'max_features': 0.5} | f1 0.98939 ± 0.00195 | leaves/tree 533 | 44 s | elapsed 144 s
+[5/8] {'max_depth': 20, 'min_samples_leaf': 1, 'max_features': 'sqrt'} | f1 0.98999 ± 0.00155 | leaves/tree 966 | 30 s | elapsed 174 s
+[6/8] {'max_depth': 20, 'min_samples_leaf': 1, 'max_features': 0.5} | f1 0.99119 ± 0.00181 | leaves/tree 660 | 50 s | elapsed 224 s
+[7/8] {'max_depth': 20, 'min_samples_leaf': 4, 'max_features': 'sqrt'} | f1 0.98248 ± 0.00219 | leaves/tree 572 | 26 s | elapsed 251 s
+[8/8] {'max_depth': 20, 'min_samples_leaf': 4, 'max_features': 0.5} | f1 0.98920 ± 0.00218 | leaves/tree 501 | 41 s | elapsed 291 s
+ max_depth  min_samples_leaf max_features  n_estimators  f1_mean  f1_std   f1_se  accuracy_mean  precision_mean  recall_mean  roc_auc_mean  leaves_per_tree_mean  depth_per_tree_mean  fit_seconds_mean  seconds  within_1se_of_best  chosen
+      20.0                 1          0.5           300  0.99119 0.00181 0.00090        0.99248         0.99212      0.99026       0.99868             659.76933             20.00000           9.38156 50.33419                True    True
+       NaN                 1          0.5           300  0.99096 0.00149 0.00074        0.99228         0.99101      0.99091       0.99862             714.03467             27.54800           8.47808 45.12815                True   False
+       NaN                 1         sqrt           300  0.99026 0.00165 0.00083        0.99168         0.99008      0.99045       0.99861            1213.82533             33.15133           4.66628 26.92656               False   False
+      20.0                 1         sqrt           300  0.98999 0.00155 0.00077        0.99146         0.99122      0.98876       0.99855             966.48733             20.00000           5.26205 29.74453               False   False
+       NaN                 4          0.5           300  0.98939 0.00195 0.00097        0.99094         0.98988      0.98890       0.99846             533.37667             26.08067           8.28457 44.47207               False   False
+      20.0                 4          0.5           300  0.98920 0.00218 0.00109        0.99078         0.98992      0.98848       0.99843             501.38867             19.99733           7.61737 40.63678               False   False
+       NaN                 4         sqrt           300  0.98445 0.00254 0.00127        0.98676         0.98770      0.98122       0.99811             662.09933             29.40200           4.63502 26.42858               False   False
+      20.0                 4         sqrt           300  0.98248 0.00219 0.00110        0.98512         0.98784      0.97719       0.99789             572.48267             19.98000           4.70014 26.37958               False   False
+{
+  "protocol": "group-preserving subset of the TRAINING rows (data.group_subset, seed 42); grouped 5-fold CV on the subset; url_engineered",
+  "subset_rows": 50000,
+  "subset_groups": 49229,
+  "subset_phishing_share": 0.42704,
+  "grid": {
+    "max_depth": [
+      null,
+      20
+    ],
+    "min_samples_leaf": [
+      1,
+      4
+    ],
+    "max_features": [
+      "sqrt",
+      0.5
+    ]
+  },
+  "n_estimators_fixed": 300,
+  "n_candidates_planned": 8,
+  "n_candidates_done": 8,
+  "complete": true,
+  "time_budget_s": 1800.0,
+  "selection_rule": "fewest mean leaves per tree with mean F1 >= best - SE(best)",
+  "best": {
+    "max_depth": 20,
+    "min_samples_leaf": 1,
+    "max_features": 0.5,
+    "n_estimators": 300,
+    "f1_mean": 0.9911873624882507,
+    "f1_std": 0.001809524447344243,
+    "f1_se": 0.0009047622236721216,
+    "leaves_per_tree_mean": 659.7693333333333
+  },
+  "one_se_choice": {
+    "max_depth": 20,
+    "min_samples_leaf": 1,
+    "max_features": 0.5,
+    "n_estimators": 300,
+    "f1_mean": 0.9911873624882507,
+    "f1_std": 0.001809524447344243,
+    "leaves_per_tree_mean": 659.7693333333333
+  },
+  "seconds": 291.3
+}
+
+Saved <PROJECT_ROOT>\reports\tuning\tuning_summary.json | total 7.7 min

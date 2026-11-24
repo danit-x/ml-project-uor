@@ -1,0 +1,5 @@
+feature_set,kind,column,abs_r
+url_base,max |r| between kept columns,,0.951642515241213
+url_engineered,max |r| between kept columns,,0.951642515241213
+url_engineered,removed (closest kept: NoOfAmpersandInURL),url_encoded_byte_count,0.9935997655772131
+extended,max |r| between kept columns,,0.9609464535742569
