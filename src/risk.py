@@ -53,37 +53,46 @@ def risk_levels(scores) -> pd.Categorical:
     return pd.cut(np.asarray(scores), bins=bins, labels=LEVELS, right=False)
 
 
-def calibrate(unfitted_model, X_train, y_train, method=CALIBRATION):
+def calibrate(unfitted_model, X_train, y_train, method=CALIBRATION, groups=None):
     """Fit a probability-calibrated version of a model on training data only.
 
-    Uses the shared CV folds: each fold's model is calibrated on the rows it
+    Uses the shared CV folds (grouped when groups, the training rows' URL
+    group ids, are given): each fold's model is calibrated on the rows it
     did not see, and the fold models are averaged. Never pass the test set.
     """
-    from .evaluate import cv_splitter
+    from .evaluate import cv_folds
 
-    calibrated = CalibratedClassifierCV(unfitted_model, method=method, cv=cv_splitter())
+    calibrated = CalibratedClassifierCV(
+        unfitted_model, method=method, cv=cv_folds(X_train, y_train, groups)
+    )
     return calibrated.fit(X_train, y_train)
 
 
-def _maybe_calibrated(unfitted_model, method):
-    """The model itself for method 'none', else an unfitted calibrated wrapper."""
+def _maybe_calibrated(unfitted_model, method, inner_cv=None):
+    """The model itself for method 'none', else an unfitted calibrated wrapper.
+
+    inner_cv: CV for the calibration inside each outer fold. Default is the
+    legacy cv_splitter(); grouped inner folds would need the groups of each
+    outer training fold, which CalibratedClassifierCV does not receive here.
+    """
     if method == "none":
         return unfitted_model
     from .evaluate import cv_splitter
 
-    return CalibratedClassifierCV(unfitted_model, method=method, cv=cv_splitter())
+    return CalibratedClassifierCV(unfitted_model, method=method, cv=inner_cv or cv_splitter())
 
 
-def oof_scores(unfitted_model, X_train, y_train) -> np.ndarray:
+def oof_scores(unfitted_model, X_train, y_train, groups=None) -> np.ndarray:
     """Out-of-fold phishing probabilities on the training set (shared CV folds).
 
     Every row is scored by a model that did not see it, so these scores show
     how the risk score behaves on new URLs without touching the test set.
     """
-    from .evaluate import cv_splitter
+    from .evaluate import cv_folds
 
     proba = cross_val_predict(
-        unfitted_model, X_train, y_train, cv=cv_splitter(), method="predict_proba"
+        unfitted_model, X_train, y_train, cv=cv_folds(X_train, y_train, groups),
+        method="predict_proba",
     )
     return proba[:, 1]
 
@@ -103,7 +112,7 @@ def score_metrics(y, scores) -> dict:
     }
 
 
-def calibration_report(unfitted_model, X_train, y_train, methods=CALIBRATION_METHODS):
+def calibration_report(unfitted_model, X_train, y_train, methods=CALIBRATION_METHODS, groups=None):
     """Compare no calibration, sigmoid (Platt) and isotonic on training data.
 
     Inputs: an unfitted model (e.g. forest.build()), training features/target.
@@ -115,7 +124,7 @@ def calibration_report(unfitted_model, X_train, y_train, methods=CALIBRATION_MET
     """
     scores, rows = {}, {}
     for m in methods:
-        scores[m] = oof_scores(_maybe_calibrated(unfitted_model, m), X_train, y_train)
+        scores[m] = oof_scores(_maybe_calibrated(unfitted_model, m), X_train, y_train, groups)
         rows[m] = score_metrics(y_train, scores[m])
     return pd.DataFrame(rows).T, scores
 

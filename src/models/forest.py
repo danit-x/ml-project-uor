@@ -25,28 +25,56 @@ PARAM_DISTRIBUTIONS = {
 }
 
 
+# Bounded grouped search used for the progress evaluation (tune_models.py part
+# "rf_subset"). A full-data RandomizedSearchCV (100 forest fits on 150k rows) was
+# judged too expensive, so: a reproducible group-preserving subset of the training
+# rows (data.group_subset, SUBSET_ROWS), the same grouped 5-fold CV and url_engineered
+# features, and 2 x 2 x 2 = 8 candidates on the settings that change a forest's
+# capacity. n_estimators is fixed, not tuned (more trees only lower variance and cost
+# time); class_weight is left at None (classes are about 43 / 57 %, not imbalanced).
+SUBSET_ROWS = 50_000
+SUBSET_N_ESTIMATORS = 300
+SUBSET_PARAM_GRID = {
+    "max_depth": [None, 20],
+    "min_samples_leaf": [1, 4],
+    "max_features": ["sqrt", 0.5],
+}
+
+# Frozen 2026-11-24 from tune_models.py part "rf_subset" (reports/tuning/rf_subset_search.csv):
+# 50,000 training rows in 49,229 whole URL groups (phishing share 0.4270 vs 0.4271 on the
+# full training split), url_engineered (23 features), grouped 5-fold CV on the subset,
+# phishing F1, no test rows; 8 candidates, 40 forest fits, 4.9 min. Mean CV F1 (std):
+#   depth 20,   leaf 1, max_features 0.5:  0.99119 (0.00181), 660 leaves/tree  <- best and chosen
+#   depth None, leaf 1, max_features 0.5:  0.99096 (0.00149), 714 leaves/tree  (within 1 SE)
+#   depth None, leaf 1, sqrt:              0.99026 (0.00165), 1,214 leaves/tree
+#   leaf 4 (any): 0.9825 - 0.9894 (larger leaves lose about 0.002 - 0.009 F1)
+# Rule fixed before the run: fewest mean leaves per tree among candidates with mean
+# F1 >= best - SE(best) (SE 0.00090). These are SUBSET CV numbers (tuning evidence);
+# the forest is trained on the full training split by main.py, whose grouped CV on the
+# full split is in reports/cv_results.csv. Superseded: 500 trees, depth 20, sqrt (20k
+# sample, ungrouped CV, all original features incl. page content).
+BEST_PARAMS = {
+    "n_estimators": SUBSET_N_ESTIMATORS,
+    "max_depth": 20,
+    "min_samples_leaf": 1,
+    "max_features": 0.5,
+    "class_weight": None,
+}
+TUNING_NOTE = (
+    "Bounded grouped 5-fold CV on a 50,000-row group-preserving training subset, url_engineered, "
+    "one-SE rule on leaves per tree: depth 20, leaf 1, max_features 0.5, 300 trees, "
+    "subset CV F1 = 0.99119 (std 0.00181)."
+)
+
+
 def build():
-    """Unfitted model with the tuned hyperparameters.
+    """Unfitted model with the tuned hyperparameters (BEST_PARAMS).
 
     Trees need no scaling, so no Pipeline is required (nothing is fitted
     before the model).
-
-    Chosen by tune() on the 20,000-row sample, original features without
-    URLSimilarityIndex (group decision after the phase 2 leakage check), CV F1.
-    Two candidates tied for best (CV F1 0.99956, std 0.00027): 500 trees,
-    min_samples_leaf=1, sqrt features, max_depth 20 or 30. Depth 20 is taken
-    as the more regularised of the two. The previous build() (100 trees,
-    min_samples_leaf=8) now ranks 19th of 20 (0.99788): without the leaking
-    column the forest needs full-depth leaves to use the weaker signals.
-    Leaves of size 1 give coarser probabilities, so risk.calibration_report()
-    checks whether calibration helps the risk score (notebook 04 phase 4).
     """
     return RandomForestClassifier(
-        n_estimators=500,
-        max_depth=20,
-        min_samples_leaf=1,
-        max_features="sqrt",
-        class_weight=None,
+        **BEST_PARAMS,
         n_jobs=-1,
         random_state=config.RANDOM_STATE,
     )
@@ -57,7 +85,7 @@ def train(X, y):
     return build().fit(X, y)
 
 
-def tune(X_train, y_train, n_iter=20, scoring="f1"):
+def tune(X_train, y_train, n_iter=20, scoring="f1", groups=None):
     """Randomized hyperparameter search on the training set only.
 
     Inputs: training features and target (1 = phishing), number of random
@@ -67,9 +95,10 @@ def tune(X_train, y_train, n_iter=20, scoring="f1"):
 
     Why randomized and not grid: 4*4*4*4*2 = 512 combinations would take hours;
     20 random candidates cover the space well when only a few settings matter.
-    Uses evaluate.cv_splitter() so the folds match every other member's.
+    Uses evaluate.cv_folds() so the folds match every other member's; pass
+    the training rows' URL group ids as groups (approved grouped CV).
     """
-    from ..evaluate import CV_METRICS, cv_splitter
+    from ..evaluate import CV_METRICS, cv_folds
 
     search = RandomizedSearchCV(
         RandomForestClassifier(n_jobs=-1, random_state=config.RANDOM_STATE),
@@ -77,7 +106,7 @@ def tune(X_train, y_train, n_iter=20, scoring="f1"):
         n_iter=n_iter,
         scoring=CV_METRICS,
         refit=scoring,
-        cv=cv_splitter(),
+        cv=cv_folds(X_train, y_train, groups),
         random_state=config.RANDOM_STATE,
         n_jobs=1,  # the forest itself already uses all cores
     )

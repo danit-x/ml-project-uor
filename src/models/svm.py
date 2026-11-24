@@ -53,18 +53,22 @@ def train(X, y):
     return build().fit(X, y)
 
 
-def tune(X_train, y_train, n_jobs=1):
-    """Tune C using shared stratified training CV; never pass test rows.
+def tune(X_train, y_train, n_jobs=1, groups=None):
+    """Tune C using shared training CV; never pass test rows.
 
     C is tuned on a modest TRAINING SUBSET first; the scoring protocol stays
     identical to the other models. Expensive nested calibration is intentional.
+    groups: URL group ids of the training rows (approved grouped CV,
+    evaluate.cv_folds). Without them the legacy ungrouped folds are used and
+    an UngroupedCVWarning is emitted; BEST_C above came from such a run, so
+    the SVM stays PROVISIONAL until it is retuned with groups.
     """
     search = GridSearchCV(
         build(),
         param_grid=PARAM_GRID,
         scoring=evaluate.CV_METRICS,
         refit=REFIT_METRIC,
-        cv=evaluate.cv_splitter(),
+        cv=evaluate.cv_folds(X_train, y_train, groups),
         n_jobs=n_jobs,
         error_score="raise",
     )
