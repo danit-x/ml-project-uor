@@ -1,0 +1,98 @@
+Rows after cleaning: 235,370
+URL groups: 231,779 (3,287 with several rows); label-conflict groups kept as label noise: 43 (86 rows)
+Train rows 188,297 | test rows 47,073 (20.0%) | phishing share train 0.4271, test 0.4271 | shared groups: 0
+  url_base (secondary): 20 features
+  url_engineered (primary): 23 features
+  extended (secondary): 52 features
+  engineered features removed as redundant (|r| >= 0.98): ['url_encoded_byte_count']
+Feature selection refitted inside each CV fold: 15 of 15 (fold, set) pairs chose the same columns as the training-rows filter
+Grouped CV on url_base (20 features, selected per fold) ...
+Grouped CV on url_engineered (23 features, selected per fold) ...
+Grouped CV on extended (52 features, selected per fold) ...
+Saved <PROJECT_ROOT>\reports\cv_results.csv (training CV, not test results)
+   feature_set               model  accuracy_mean  precision_mean  recall_mean  f1_mean  roc_auc_mean  f1_std
+      url_base Logistic Regression         0.9976          0.9999       0.9945   0.9972        0.9986  0.0003
+      url_base       Decision Tree         0.9919          0.9916       0.9893   0.9905        0.9907  0.0004
+      url_base       Random Forest         0.9958          0.9958       0.9943   0.9950        0.9989  0.0002
+url_engineered Logistic Regression         0.9972          0.9997       0.9938   0.9967        0.9986  0.0003
+url_engineered       Decision Tree         0.9919          0.9917       0.9893   0.9905        0.9908  0.0004
+url_engineered       Random Forest         0.9958          0.9960       0.9941   0.9950        0.9989  0.0002
+      extended Logistic Regression         0.9993          0.9993       0.9990   0.9991        1.0000  0.0001
+      extended       Decision Tree         0.9990          0.9989       0.9987   0.9988        0.9985  0.0003
+      extended       Random Forest         0.9997          0.9997       0.9997   0.9997        1.0000  0.0000
+
+Training Logistic Regression on url_base features (20) ...
+Training Decision Tree on url_base features (20) ...
+Training Random Forest on url_base features (20) ...
+Training SVM on url_base features (20) ...
+Training Logistic Regression on url_engineered features (23) ...
+Training Decision Tree on url_engineered features (23) ...
+Training Random Forest on url_engineered features (23) ...
+Training SVM on url_engineered features (23) ...
+Training Logistic Regression on extended features (52) ...
+Training Decision Tree on extended features (52) ...
+Training Random Forest on extended features (52) ...
+Training SVM on extended features (52) ...
+Saved <PROJECT_ROOT>\reports\results.csv (held-out test, frozen configurations)
+
+   feature_set               model  accuracy precision    recall        f1   roc_auc    tn  fp  fn    tp     brier n_features      role    protocol
+      url_base Logistic Regression  0.997791   0.99985  0.994976  0.997407  0.998483 26966   3 101 20003  0.002094         20 secondary   secondary
+      url_base       Decision Tree   0.99299  0.993413  0.990151  0.991779  0.991878 26837 132 198 19906  0.006939         20 secondary   secondary
+      url_base       Random Forest  0.995645   0.99621  0.993583  0.994895  0.998698 26893  76 129 19975  0.004253         20 secondary   secondary
+      url_base                 SVM  0.987105  0.987937  0.981795  0.984856  0.996148 26728 241 366 19738  0.010847         20 secondary provisional
+url_engineered Logistic Regression  0.997663    0.9999  0.994628  0.997257  0.998519 26967   2 108 19996   0.00219         23   primary    official
+url_engineered       Decision Tree  0.992947  0.993264  0.990201   0.99173  0.991963 26834 135 197 19907  0.006968         23   primary    official
+url_engineered       Random Forest  0.995751   0.99626  0.993782   0.99502  0.998774 26894  75 125 19979  0.004361         23   primary    official
+url_engineered                 SVM  0.986192  0.986983  0.980601  0.983782  0.995767 26709 260 390 19714  0.011689         23   primary provisional
+      extended Logistic Regression  0.999511  0.999503  0.999353  0.999428  0.999997 26959  10  13 20091  0.000449         52 secondary   secondary
+      extended       Decision Tree  0.999193  0.999154  0.998955  0.999055  0.998752 26952  17  21 20083  0.000809         52 secondary   secondary
+      extended       Random Forest  0.999809  0.999751  0.999801  0.999776  0.999999 26964   5   4 20100  0.000278         52 secondary   secondary
+      extended                 SVM  0.999341  0.999552  0.998906  0.999229  0.999997 26960   9  22 20082  0.000484         52 secondary provisional
+
+WARNING: 12 rows have a metric >= 0.99. Treat this as a prompt to check for leakage/collection bias, not as a headline result.
+
+OFFICIAL comparison (url_engineered, grouped split and folds) -> <PROJECT_ROOT>\reports\official_comparison.csv
+              model  cv_accuracy_mean  cv_accuracy_std  cv_precision_mean  cv_precision_std  cv_recall_mean  cv_recall_std  cv_f1_mean  cv_f1_std  cv_roc_auc_mean  cv_roc_auc_std n_features test_accuracy test_precision test_recall   test_f1 test_roc_auc test_tn test_fp test_fn test_tp test_brier    feature_set
+Logistic Regression            0.9972           0.0002             0.9997            0.0002          0.9938         0.0005      0.9967     0.0003           0.9986          0.0003         23      0.997663         0.9999    0.994628  0.997257     0.998519   26967       2     108   19996    0.00219 url_engineered
+      Decision Tree            0.9919           0.0004             0.9917            0.0005          0.9893         0.0004      0.9905     0.0004           0.9908          0.0004         23      0.992947       0.993264    0.990201   0.99173     0.991963   26834     135     197   19907   0.006968 url_engineered
+      Random Forest            0.9958           0.0002             0.9960            0.0005          0.9941         0.0003      0.9950     0.0002           0.9989          0.0002         23      0.995751        0.99626    0.993782   0.99502     0.998774   26894      75     125   19979   0.004361 url_engineered
+
+SVM (PROVISIONAL, not part of the official comparison: C from the earlier ungrouped 2,000-row tuning):
+   feature_set model  accuracy precision    recall        f1   roc_auc
+      url_base   SVM  0.987105  0.987937  0.981795  0.984856  0.996148
+url_engineered   SVM  0.986192  0.986983  0.980601  0.983782  0.995767
+      extended   SVM  0.999341  0.999552  0.998906  0.999229  0.999997
+
+REFERENCE (not a model): rule 'not a bare https://www homepage -> phishing' -> <PROJECT_ROOT>\reports\format_baseline.csv
+                                reference  cv_accuracy_mean  cv_accuracy_std  cv_precision_mean  cv_precision_std  cv_recall_mean  cv_recall_std  cv_f1_mean  cv_f1_std  cv_roc_auc_mean  cv_roc_auc_std  test_accuracy  test_precision  test_recall  test_f1  test_roc_auc  test_tn  test_fp  test_fn  test_tp  share_legitimate_bare_train  share_phishing_bare_train
+not bare https://www homepage -> phishing            0.9956           0.0003                1.0               0.0          0.9897         0.0008      0.9948     0.0004           0.9949          0.0004         0.9956             1.0       0.9896   0.9948        0.9948    26969        0      209    19895                          1.0                     0.0103
+
+FORMAT-CONTROLLED test breakdown (diagnostic only, frozen models) -> <PROJECT_ROOT>\reports\format_controlled.csv
+                   subset                   model  n_rows  n_phishing  n_legitimate    tn  fp  fn    tp  phishing_recall  false_positive_rate  accuracy
+bare https://www homepage format rule (reference)   27178         209         26969 26969   0 209     0           0.0000               0.0000    0.9923
+bare https://www homepage     Logistic Regression   27178         209         26969 26967   2 107   102           0.4880               0.0001    0.9960
+bare https://www homepage           Decision Tree   27178         209         26969 26834 135 103   106           0.5072               0.0050    0.9912
+bare https://www homepage           Random Forest   27178         209         26969 26894  75 105   104           0.4976               0.0028    0.9934
+               other URLs format rule (reference)   19895       19895             0     0   0   0 19895           1.0000                  NaN    1.0000
+               other URLs     Logistic Regression   19895       19895             0     0   0   1 19894           0.9999                  NaN    0.9999
+               other URLs           Decision Tree   19895       19895             0     0   0  94 19801           0.9953                  NaN    0.9953
+               other URLs           Random Forest   19895       19895             0     0   0  20 19875           0.9990                  NaN    0.9990
+Calibrating Random Forest (sigmoid) on training rows (grouped folds) ...
+Calibrated forest, test set: {'brier': 0.00379, 'log_loss': 0.01869, 'roc_auc': 0.99873}
+  band score_range  n_urls  share_of_urls  phishing_rate  n_phishing  n_legit
+   Low    [0, 0.3)   26957         0.5727          0.004         108    26849
+Medium  [0.3, 0.7)      99         0.0021          0.404          40       59
+  High    [0.7, 1]   20017         0.4252          0.997       19956       61
+SHAP for 500 test URLs ...
+Saved shap_importance.csv, risk_scores.csv, figures/shap_summary.png
+                   feature  mean_abs_shap
+          LetterRatioInURL         0.1439
+     SpacialCharRatioInURL         0.1038
+NoOfOtherSpecialCharsInURL         0.0909
+              DomainLength         0.0693
+                 URLLength         0.0525
+           DegitRatioInURL         0.0514
+           NoOfDegitsInURL         0.0430
+          NoOfLettersInURL         0.0309
+         TLDLegitimateProb         0.0208
+             NoOfSubDomain         0.0142

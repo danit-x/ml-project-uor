@@ -1,0 +1,128 @@
+Training rows 188,297 | url_engineered: 23 features | folds [37660, 37659, 37659, 37660, 37659] | prep 143 s
+
+=== lr_followup ===
+[ 1/50] l2/lbfgs     C=0.001  fold 0 | f1 0.82926 n_iter   17 converged | 1.5 s | elapsed 9 s
+[ 2/50] l2/lbfgs     C=0.001  fold 1 | f1 0.82471 n_iter   18 converged | 1.7 s | elapsed 9 s
+[ 3/50] l2/lbfgs     C=0.001  fold 2 | f1 0.82686 n_iter   17 converged | 1.7 s | elapsed 11 s
+[ 4/50] l2/lbfgs     C=0.001  fold 3 | f1 0.82212 n_iter   17 converged | 1.4 s | elapsed 11 s
+[ 5/50] l2/lbfgs     C=0.001  fold 4 | f1 0.82753 n_iter   16 converged | 1.4 s | elapsed 12 s
+[ 6/50] l2/lbfgs     C=0.01   fold 0 | f1 0.83692 n_iter   34 converged | 2.3 s | elapsed 13 s
+[ 7/50] l2/lbfgs     C=0.01   fold 1 | f1 0.83404 n_iter   31 converged | 2.6 s | elapsed 15 s
+[ 8/50] l2/lbfgs     C=0.01   fold 2 | f1 0.83680 n_iter   27 converged | 2.2 s | elapsed 15 s
+[ 9/50] l2/lbfgs     C=0.01   fold 3 | f1 0.82955 n_iter   34 converged | 2.1 s | elapsed 17 s
+[10/50] l2/lbfgs     C=0.01   fold 4 | f1 0.83631 n_iter   35 converged | 2.2 s | elapsed 18 s
+[11/50] l2/lbfgs     C=0.1    fold 0 | f1 0.85480 n_iter   75 converged | 4.1 s | elapsed 21 s
+[12/50] l2/lbfgs     C=0.1    fold 1 | f1 0.85665 n_iter   65 converged | 3.6 s | elapsed 21 s
+[13/50] l2/lbfgs     C=0.1    fold 3 | f1 0.84700 n_iter   61 converged | 4.2 s | elapsed 26 s
+[14/50] l2/lbfgs     C=0.1    fold 2 | f1 0.85509 n_iter   85 converged | 5.0 s | elapsed 26 s
+[15/50] l2/lbfgs     C=0.1    fold 4 | f1 0.86058 n_iter   65 converged | 4.4 s | elapsed 30 s
+[16/50] l2/lbfgs     C=1      fold 1 | f1 0.97454 n_iter  107 converged | 6.3 s | elapsed 36 s
+[17/50] l2/lbfgs     C=1      fold 0 | f1 0.96605 n_iter  174 converged | 10.7 s | elapsed 37 s
+[18/50] l2/lbfgs     C=1      fold 3 | f1 0.96286 n_iter  147 converged | 8.8 s | elapsed 46 s
+[19/50] l2/lbfgs     C=1      fold 2 | f1 0.96820 n_iter  195 converged | 11.9 s | elapsed 48 s
+[20/50] l2/lbfgs     C=1      fold 4 | f1 0.97818 n_iter  159 converged | 8.0 s | elapsed 54 s
+[21/50] l2/lbfgs     C=3      fold 0 | f1 0.99154 n_iter  223 converged | 12.3 s | elapsed 61 s
+[22/50] l2/lbfgs     C=3      fold 1 | f1 0.99306 n_iter  126 converged | 7.3 s | elapsed 61 s
+[23/50] l2/lbfgs     C=3      fold 2 | f1 0.99000 n_iter  169 converged | 8.7 s | elapsed 69 s
+[24/50] l2/lbfgs     C=3      fold 3 | f1 0.99016 n_iter  153 converged | 8.5 s | elapsed 70 s
+[25/50] l2/lbfgs     C=3      fold 4 | f1 0.99208 n_iter  137 converged | 8.0 s | elapsed 77 s
+[26/50] l2/lbfgs     C=10     fold 0 | f1 0.99544 n_iter  145 converged | 7.8 s | elapsed 77 s
+[27/50] l2/lbfgs     C=10     fold 1 | f1 0.99582 n_iter  115 converged | 6.5 s | elapsed 84 s
+[28/50] l2/lbfgs     C=10     fold 2 | f1 0.99481 n_iter  161 converged | 9.7 s | elapsed 87 s
+[29/50] l2/lbfgs     C=10     fold 3 | f1 0.99500 n_iter   95 converged | 4.9 s | elapsed 89 s
+[30/50] l2/lbfgs     C=10     fold 4 | f1 0.99494 n_iter   98 converged | 5.1 s | elapsed 92 s
+[31/50] l2/lbfgs     C=30     fold 0 | f1 0.99629 n_iter  111 converged | 5.9 s | elapsed 95 s
+[32/50] l2/lbfgs     C=30     fold 1 | f1 0.99657 n_iter  103 converged | 5.2 s | elapsed 97 s
+[33/50] l2/lbfgs     C=30     fold 2 | f1 0.99619 n_iter   89 converged | 5.0 s | elapsed 100 s
+[34/50] l2/lbfgs     C=30     fold 3 | f1 0.99626 n_iter  105 converged | 5.2 s | elapsed 103 s
+[35/50] l2/lbfgs     C=30     fold 4 | f1 0.99594 n_iter   84 converged | 3.9 s | elapsed 104 s
+[36/50] l2/lbfgs     C=100    fold 0 | f1 0.99676 n_iter  124 converged | 6.6 s | elapsed 109 s
+[37/50] l2/lbfgs     C=100    fold 1 | f1 0.99669 n_iter  116 converged | 6.2 s | elapsed 110 s
+[38/50] l2/lbfgs     C=100    fold 2 | f1 0.99632 n_iter   90 converged | 4.4 s | elapsed 114 s
+[39/50] l2/lbfgs     C=100    fold 3 | f1 0.99647 n_iter  105 converged | 5.4 s | elapsed 115 s
+[40/50] l2/lbfgs     C=100    fold 4 | f1 0.99610 n_iter   83 converged | 4.5 s | elapsed 118 s
+[41/50] l2/lbfgs     C=300    fold 0 | f1 0.99679 n_iter   84 converged | 4.1 s | elapsed 120 s
+[42/50] l2/lbfgs     C=300    fold 1 | f1 0.99666 n_iter   86 converged | 3.8 s | elapsed 122 s
+[43/50] l2/lbfgs     C=300    fold 2 | f1 0.99651 n_iter  125 converged | 5.3 s | elapsed 125 s
+[44/50] l2/lbfgs     C=300    fold 3 | f1 0.99672 n_iter  107 converged | 5.0 s | elapsed 127 s
+[45/50] l2/lbfgs     C=300    fold 4 | f1 0.99619 n_iter   79 converged | 4.1 s | elapsed 129 s
+[46/50] l2/lbfgs     C=1000   fold 0 | f1 0.99691 n_iter  107 converged | 5.1 s | elapsed 132 s
+[47/50] l2/lbfgs     C=1000   fold 1 | f1 0.99698 n_iter   91 converged | 4.2 s | elapsed 133 s
+[48/50] l2/lbfgs     C=1000   fold 2 | f1 0.99682 n_iter   84 converged | 3.8 s | elapsed 136 s
+[49/50] l2/lbfgs     C=1000   fold 3 | f1 0.99673 n_iter   80 converged | 3.6 s | elapsed 137 s
+[50/50] l2/lbfgs     C=1000   fold 4 | f1 0.99626 n_iter   98 converged | 3.0 s | elapsed 139 s
+penalty solver        C  valid  n_converged  n_iter_max  f1_mean  f1_std   f1_se  roc_auc_mean  within_1se_of_best  chosen
+     l2  lbfgs 1000.000   True            5         107  0.99674 0.00026 0.00013       0.99860                True    True
+     l2  lbfgs  300.000   True            5         125  0.99658 0.00021 0.00011       0.99864               False   False
+     l2  lbfgs  100.000   True            5         124  0.99647 0.00024 0.00012       0.99862               False   False
+     l2  lbfgs   30.000   True            5         111  0.99625 0.00020 0.00010       0.99856               False   False
+     l2  lbfgs   10.000   True            5         161  0.99520 0.00037 0.00019       0.99836               False   False
+     l2  lbfgs    3.000   True            5         223  0.99137 0.00116 0.00058       0.99768               False   False
+     l2  lbfgs    1.000   True            5         195  0.96997 0.00561 0.00281       0.99516               False   False
+     l2  lbfgs    0.100   True            5          85  0.85482 0.00442 0.00221       0.95528               False   False
+     l2  lbfgs    0.010   True            5          35  0.83472 0.00279 0.00139       0.92068               False   False
+     l2  lbfgs    0.001   True            5          18  0.82610 0.00246 0.00123       0.90675               False   False
+{
+  "search_space": [
+    {
+      "solver": "lbfgs",
+      "l1_ratio": 0.0,
+      "C": [
+        0.001,
+        0.01,
+        0.1,
+        1.0,
+        3.0,
+        10.0,
+        30.0,
+        100.0,
+        300.0,
+        1000.0
+      ]
+    }
+  ],
+  "max_iter": 1000,
+  "n_jobs": 2,
+  "time_budget_s": 900.0,
+  "n_fits_expected": 50,
+  "n_fits": 50,
+  "complete": true,
+  "n_fits_converged": 50,
+  "n_valid_candidates": 10,
+  "selection_rule": "valid = converged in every fold; best = highest mean F1 among valid; chosen = smallest C with mean F1 >= best - SE(best)",
+  "best_mean_f1": {
+    "penalty": "l2",
+    "solver": "lbfgs",
+    "C": 1000.0,
+    "f1_mean": 0.9967382983164195,
+    "f1_std": 0.0002554694303740943,
+    "f1_se": 0.00012773471518704715,
+    "roc_auc_mean": 0.9985970984434147,
+    "precision_mean": 0.9997498451005356,
+    "recall_mean": 0.9937450238514168,
+    "accuracy_mean": 0.9972224722742927,
+    "n_converged": 5,
+    "n_iter_max": 107,
+    "n_nonzero_coef_mean": 23.0
+  },
+  "one_se_choice": {
+    "penalty": "l2",
+    "solver": "lbfgs",
+    "C": 1000.0,
+    "f1_mean": 0.9967382983164195,
+    "f1_std": 0.0002554694303740943,
+    "f1_se": 0.00012773471518704715,
+    "roc_auc_mean": 0.9985970984434147,
+    "precision_mean": 0.9997498451005356,
+    "recall_mean": 0.9937450238514168,
+    "accuracy_mean": 0.9972224722742927,
+    "n_converged": 5,
+    "n_iter_max": 107,
+    "n_nonzero_coef_mean": 23.0
+  },
+  "best_at_upper_edge_of_C": true,
+  "earlier_full_run": "stopped after 36/45 fits; see lr_full_run_INCOMPLETE_2026-11-24.log (L1/liblinear C=0.1 fold 1 not converged; 9 L1 fits never finished)",
+  "seconds": 139.6
+}
+
+Saved <PROJECT_ROOT>\reports\tuning\tuning_summary.json | total 4.7 min

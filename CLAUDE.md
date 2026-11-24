@@ -21,16 +21,34 @@ recall and risk score all refer to phishing.
 Pipeline in `main.py:run()`:
 1. `data.load_clean_data()`: `load_raw()` then `clean()` (optional `--sample` uses `RANDOM_STATE`)
 2. `data.get_original_features(df)`: numeric columns, minus target, `TEXT_COLUMNS`, engineered columns
-3. `features.add_features(df)` adds `ENGINEERED_FEATURES`; `features.select_features(train_rows, cols)`
-   returns the kept columns. main.py passes **training rows only** (`df.loc[X_train.index]`)
-4. For feature sets `original` and `engineered`: `data.split(df, cols)` then, for each
-   module in `src/models/__init__.py:MODELS`, `module.train(X_train, y_train)`
-5. `evaluate.evaluate(model, X_test, y_test)` then `evaluate.compare(results)` writes
-   `reports/results.csv` (a `--sample N` run writes `reports/results_sample_N.csv`, gitignored)
-6. Fitted models go to `saved_models/<model>_<set>.joblib`
+3. `features.add_features(df)` adds `ENGINEERED_FEATURES`; `data.group_ids(df)` gives URL groups;
+   `data.split_index(df)` is the group-aware split (`StratifiedGroupKFold`, one fold = test)
+4. `features.build_feature_sets(df.loc[train_idx])` (**training rows only**) returns
+   `url_base`, `url_engineered` (primary) and `extended`; `URLSimilarityIndex` is in none
+5. Grouped training CV of LR, DT and RF on every set (`evaluate.compare_training_models(..., groups=)`),
+   each model wrapped as `make_pipeline(features.FeatureSetSelector(set), build())` so the feature-set
+   filter is refitted inside every fold, writes `reports/cv_results.csv`; then for each set and each module in `MODELS`,
+   `module.train(X_train, y_train)`, `evaluate.evaluate(model, X_test, y_test)` and `evaluate.compare(results)`
+   write `reports/results.csv` with a `protocol` column (official = LR/DT/RF on `url_engineered`;
+   secondary = other sets; provisional = SVM, whose C came from the earlier ungrouped sample tuning).
+   `reports/official_comparison.csv` = the three-model comparison (grouped CV + test);
+   `reports/format_baseline.csv` = the fixed rule "not a bare https://www homepage -> phishing", a reference only;
+   `reports/format_controlled.csv` = held-out results split into bare-homepage URLs vs all others (diagnostic);
+   `reports/risk_bands.csv` = calibrated forest bands on the test rows
+   (a `--sample N` run writes the `*_sample_N.csv` files, gitignored)
+6. Fitted models go to `saved_models/<model>_<set>.joblib`, plus `random_forest_calibrated_url_engineered.joblib`
+   and `manifest.json` (which run wrote them). `python demo.py` scores/explains held-out test URLs from these files
+   (it refuses URLs outside the held-out test rows).
+
+Hyperparameters are chosen by `python tune_models.py` (grouped CV, training rows, `url_engineered`;
+writes `reports/tuning/`), then copied by hand into the `BEST_*` constants; `main.py` does no search.
+Progress-evaluation choices: LR = part `lr_followup` (L2/lbfgs, full training split, C = 1000 at the
+upper edge; the full `lr` grid was stopped, L1 did not converge); DT = part `dt` complexity review
+(max_depth 20); RF = part `rf_subset` (bounded grid on a 50k-row group-preserving training subset).
+SVM is provisional (ungrouped 2,000-row tuning).
 
 `src/risk.py` (`risk_score`, `risk_level`, `calibrate`) and `src/explain.py` (SHAP)
-are not yet called by `main.py`. They are used from notebook 04.
+are called by `main.risk_and_explain()` for the Random Forest on the primary set, and from notebook 04.
 
 Interface contract (main.py depends on it, so keep names and signatures):
 - every `src/models/*.py` exposes `build()` (unfitted estimator) and `train(X, y)` (fitted)
@@ -93,24 +111,29 @@ selection, calibration) is fitted on training data only, inside an sklearn
   repeated URLs so the same URL cannot be in both train and test. Keep that.
 - `risk.calibrate()` fits on training data (internal CV). Never calibrate on the test set.
 
-**Splits and config.** Always split with `data.split()`. Use `config.RANDOM_STATE`
+**Splits and config.** Always split with `data.split()` (group-aware: near-duplicate URLs with the
+same `data.url_group_key()` never cross train/test; label-conflict groups are kept as label noise). Use `config.RANDOM_STATE`
 (42) and `config.TEST_SIZE` (0.2) everywhere, never literal seeds. Do not change
 `config.py` values without group agreement.
 
-**Tuning.** Use `GridSearchCV`/`RandomizedSearchCV` with `cv=evaluate.cv_splitter()`
-(`config.CV_FOLDS` stratified, shuffled, seeded folds) on `X_train` only. Compare
-variants with `evaluate.cv_evaluate(module.build(), X_train, y_train)`. Write the chosen
+**Tuning.** Use `GridSearchCV`/`RandomizedSearchCV` with `cv=evaluate.cv_folds(X_train, y_train, groups)`
+(`config.CV_FOLDS` grouped, stratified, shuffled, seeded folds; `groups = data.group_ids(df).loc[X_train.index]`)
+on `X_train` only. Compare variants with `evaluate.cv_evaluate(module.build(), X_train, y_train, groups=groups)`.
+Without `groups` these fall back to ungrouped folds and emit `UngroupedCVWarning`: not valid for reporting. Write the chosen
 hyperparameters as fixed values into `build()` so `main.py` stays fast and reproducible.
 The test set is for final reporting, not model selection. Tune the SVM on a training sample first.
 
 **Evaluation.** Always use `evaluate.evaluate()` so all models are comparable.
 Report all of its metrics (accuracy, precision, recall, F1, ROC-AUC, confusion
-counts), not accuracy alone. Compare `original` and `engineered` feature sets for every model.
+counts), not accuracy alone. Report `url_engineered` as the primary result, with `url_base` and
+`extended` as controlled comparisons.
 
 **Near-perfect scores are a warning, not a result.** If any metric is about 0.99 or
 higher, check for leaking features before reporting it. Start with `URLSimilarityIndex`
 (already flagged in `select_features()`), and also check single-feature ROC-AUC on the
-training set. The group decides what to drop.
+training set. The group decides what to drop. Known collection artifact (2026-11-24): every
+legitimate PhiUSIIL URL is a bare `https://www.<host>` homepage (about 1 % of phishing URLs are),
+so always show URL-only scores next to `reports/format_baseline.csv`.
 
 **Reproducibility.** Fixed seeds. Results go to `reports/` and figures to
 `reports/figures/` (`config.RESULTS_DIR`, `config.FIGURES_DIR`). Every number in the

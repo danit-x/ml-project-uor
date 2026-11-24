@@ -1,0 +1,29 @@
+Models from main.py run of 2026-11-24T21:32:17 (full data); 47,073 held-out test URLs; feature set url_engineered.
+Bands: Low < 0.3 <= Medium < 0.7 <= High (calibration: sigmoid, fitted on training rows only).
+
+URL: http://attloginpage33121.square.site/
+  risk score 0.999  ->  band High  |  predicted phishing  |  true label phishing
+  bare https://www homepage (the dataset's legitimate-URL format): False
+  top contributions (SHAP, phishing probability units; + pushes towards phishing):
+                   feature  value  contribution pushes_towards
+           DegitRatioInURL  0.135        0.1246       phishing
+           NoOfDegitsInURL  5.000        0.1168       phishing
+NoOfOtherSpecialCharsInURL  3.000        0.1053       phishing
+
+URL: https://www.134arw.ang.af.mil
+  risk score 0.002  ->  band Low  |  predicted legitimate  |  true label legitimate
+  bare https://www homepage (the dataset's legitimate-URL format): True
+  top contributions (SHAP, phishing probability units; + pushes towards phishing):
+         feature  value  contribution pushes_towards
+   NoOfSubDomain  3.000       -0.2474     legitimate
+LetterRatioInURL  0.357       -0.1484     legitimate
+NoOfLettersInURL 10.000       -0.1297     legitimate
+
+URL: http://www.3dstudioa.com.br
+  risk score 0.498  ->  band Medium  |  predicted legitimate  |  true label phishing
+  bare https://www homepage (the dataset's legitimate-URL format): False
+  top contributions (SHAP, phishing probability units; + pushes towards phishing):
+        feature  value  contribution pushes_towards
+NoOfDegitsInURL  1.000        0.1413       phishing
+DegitRatioInURL  0.038        0.1385       phishing
+      TLDLength  2.000       -0.0700     legitimate

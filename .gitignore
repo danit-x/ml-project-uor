@@ -5,6 +5,18 @@ saved_models/*
 *.joblib
 # Quick --sample runs; only the full-dataset reports/results.csv is committed
 reports/results_sample_*.csv
+reports/cv_results_sample_*.csv
+reports/official_comparison_sample_*.csv
+reports/format_baseline_sample_*.csv
+reports/format_controlled_sample_*.csv
+reports/risk_bands_sample_*.csv
+reports/figures/*_sample_*.png
+reports/_archive/
+reports/tuning/*_sample_*
+# Incremental checkpoints of tune_models.py; the completed *_search.csv / *_folds.csv are kept
+reports/tuning/*_partial*.csv
+# Per-URL scores of held-out test URLs: raw, possibly still active phishing URLs (kept locally only)
+reports/risk_scores.csv
 !**/.gitkeep
 
 # Python
