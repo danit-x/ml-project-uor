@@ -1,0 +1,4 @@
+model,feature_set,n_test_rows,test_roc_auc,results_csv_roc_auc,abs_diff
+Logistic Regression,url_engineered,47073,0.9985192907740368,0.9985192907740368,0.0
+Decision Tree,url_engineered,47073,0.9919625906279597,0.9919625906279597,0.0
+Random Forest,url_engineered,47073,0.9987739244452707,0.9987739244452707,0.0

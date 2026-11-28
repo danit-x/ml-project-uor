@@ -261,7 +261,10 @@ def plot_confusion_matrices(models, X_valid, y_valid, title, filename=None):
 
 
 def plot_roc_curves(models, X_valid, y_valid, title, filename=None):
-    """Plot ROC for fitted models on SAME validation rows (NOT ordinary test)."""
+    """Plot ROC for fitted models on SAME validation rows (NOT ordinary test).
+
+    For the one-time held-out ROC of the frozen models use plot_test_roc().
+    """
     if not models:
         raise ValueError("Pass fitted models")
     fig, ax = plt.subplots(figsize=(7, 5.5))
@@ -303,3 +306,230 @@ def plot_feature_comparison(results, metric="f1", filename=None,
     ax.figure.tight_layout()
     _save_figure(ax.figure, filename)
     return ax.figure
+
+
+# ---------------------------------------------------------------- evaluation curves
+# Diagnostic curves of the frozen official models (progress evaluation). They are
+# computed after every model choice was made and are never used to select a model.
+
+LEARNING_CURVE_SIZES = (0.25, 0.5, 1.0)
+# Same colour + line style per model in every curve figure (colour is never the only cue).
+MODEL_STYLE = {
+    "Logistic Regression": {"color": "#008C99", "linestyle": "-", "marker": "o"},
+    "Decision Tree": {"color": "#C8701A", "linestyle": "--", "marker": "s"},
+    "Random Forest": {"color": "#6A4C9C", "linestyle": "-.", "marker": "^"},
+}
+ROC_GRID = np.linspace(0.0, 1.0, 10001)
+
+
+def learning_curve_subsets(folds, groups, train_sizes=LEARNING_CURVE_SIZES):
+    """(fold, size, fit_positions, validation_positions) for a grouped learning curve.
+
+    Input: the grouped folds from cv_folds() and the group ids of the same rows.
+    For each fold the fitting rows are a seeded subset of whole URL groups of
+    that fold's TRAINING part (data.group_subset), so a smaller size never
+    takes rows from the validation part and never splits a group; size 1.0 is
+    the full training part, i.e. exactly the fit of cv_evaluate(). Raises if a
+    URL group is on both sides, which grouped folds must never allow.
+    """
+    group_arr = np.asarray(groups)
+    for k, (train_pos, valid_pos) in enumerate(folds):
+        if set(group_arr[train_pos]) & set(group_arr[valid_pos]):
+            raise AssertionError(f"fold {k}: a URL group is in both fitting and validation rows")
+        fold_groups = pd.Series(group_arr[train_pos], index=train_pos)
+        for size in train_sizes:
+            if not 0 < size <= 1:
+                raise ValueError("train_sizes must be fractions in (0, 1]")
+            n_rows = int(round(size * len(train_pos)))
+            fit_pos = np.asarray(data.group_subset(fold_groups, n_rows))
+            yield k, size, fit_pos, valid_pos
+
+
+def grouped_learning_curve(unfitted_model, X_train, y_train, groups,
+                           train_sizes=LEARNING_CURVE_SIZES):
+    """Grouped-CV learning curve (phishing F1) and the per-fold ROC data of the full-size fits.
+
+    Input: training rows only, their target and URL group ids (required: an
+    ungrouped curve is not valid under the approved protocol). The model is
+    cloned and refitted for every (fold, size), so a FeatureSetSelector step
+    is refitted on that fitting subset only.
+    Output: (table, roc_folds). table has one row per (fold, size): fitting
+    rows, training F1 (on the fitting rows), validation F1, validation
+    ROC-AUC and, when the first pipeline step selects columns (columns_), the
+    columns it kept on that fitting subset ("selected", joined by "|").
+    roc_folds is a list of (y_valid, phishing probability) of the
+    size-1.0 fits, one per fold: the same fits as cv_evaluate(), so their
+    mean AUC must match cv_results.csv.
+    """
+    if groups is None:
+        raise ValueError("grouped_learning_curve needs URL groups (no ungrouped CV)")
+    folds = cv_folds(X_train, y_train, groups)
+    group_arr = _aligned_groups(X_train, groups)
+    y_arr = np.asarray(y_train)
+    rows, roc_folds = [], []
+    for k, size, fit_pos, valid_pos in learning_curve_subsets(folds, group_arr, train_sizes):
+        model = clone(unfitted_model).fit(X_train.iloc[fit_pos], y_arr[fit_pos])
+        valid_score = model.predict_proba(X_train.iloc[valid_pos])[:, 1]
+        rows.append({
+            "fold": k, "train_size": size, "n_fit_rows": len(fit_pos), "n_valid_rows": len(valid_pos),
+            "train_f1": f1_score(y_arr[fit_pos], model.predict(X_train.iloc[fit_pos])),
+            "valid_f1": f1_score(y_arr[valid_pos], model.predict(X_train.iloc[valid_pos])),
+            "valid_roc_auc": roc_auc_score(y_arr[valid_pos], valid_score),
+        })
+        first = model.steps[0][1] if hasattr(model, "steps") else None
+        if hasattr(first, "columns_"):
+            rows[-1]["selected"] = "|".join(first.columns_)
+        if size == 1.0:
+            roc_folds.append((y_arr[valid_pos], valid_score))
+    return pd.DataFrame(rows), roc_folds
+
+
+def summarize_learning_curve(table: pd.DataFrame) -> pd.DataFrame:
+    """Mean and std over folds of grouped_learning_curve() rows, per (model, train_size)."""
+    keys = [c for c in ("model", "train_size") if c in table.columns]
+    stats = table.groupby(keys).agg(
+        n_fit_rows_mean=("n_fit_rows", "mean"),
+        train_f1_mean=("train_f1", "mean"), train_f1_std=("train_f1", lambda s: s.std(ddof=0)),
+        valid_f1_mean=("valid_f1", "mean"), valid_f1_std=("valid_f1", lambda s: s.std(ddof=0)),
+        valid_roc_auc_mean=("valid_roc_auc", "mean"),
+        valid_roc_auc_std=("valid_roc_auc", lambda s: s.std(ddof=0)),
+    ).reset_index()
+    stats["gap_train_minus_valid"] = stats["train_f1_mean"] - stats["valid_f1_mean"]
+    return stats
+
+
+def mean_roc_curve(roc_folds, grid=ROC_GRID):
+    """(fpr grid, mean TPR, std TPR, per-fold AUCs) over grouped CV folds.
+
+    Each fold's ROC is interpolated onto the same false-positive-rate grid
+    (TPR at FPR 0 set to 0, as in sklearn's CV ROC example), then averaged.
+    The AUCs are computed per fold from the raw scores, not from the mean curve.
+    """
+    tprs, aucs = [], []
+    for y_valid, score in roc_folds:
+        fpr, tpr, _ = roc_curve(y_valid, score, pos_label=1)
+        interp = np.interp(grid, fpr, tpr)
+        interp[0] = 0.0
+        tprs.append(interp)
+        aucs.append(roc_auc_score(y_valid, score))
+    tprs = np.array(tprs)
+    mean = tprs.mean(axis=0)
+    mean[-1] = 1.0
+    return grid, mean, tprs.std(axis=0), np.array(aucs)
+
+
+def plot_learning_curves(summary: pd.DataFrame, title, filename=None, per_fold: pd.DataFrame = None):
+    """One panel per model: training and validation F1 (mean ± std over grouped folds).
+
+    per_fold (optional, grouped_learning_curve rows with a model column) adds each
+    fold's validation F1 as a small hollow marker, so a wide band shows which folds caused it.
+    """
+    models = [m for m in MODEL_STYLE if m in set(summary["model"])]
+    fig, axes = plt.subplots(1, len(models), figsize=(4.6 * len(models), 4.3), sharey=True)
+    axes = np.atleast_1d(axes)
+    for ax, name in zip(axes, models):
+        s = summary.loc[summary["model"] == name].sort_values("train_size")
+        x = s["n_fit_rows_mean"] / 1000
+        for kind, label, color, ls, marker in (("train", "Training F1", "#1B262C", "-", "o"),
+                                               ("valid", "Validation F1 (grouped CV)",
+                                                MODEL_STYLE[name]["color"], "--", "s")):
+            m, sd = s[f"{kind}_f1_mean"], s[f"{kind}_f1_std"]
+            ax.plot(x, m, color=color, linestyle=ls, marker=marker, markersize=7, linewidth=2, label=label)
+            ax.fill_between(x, m - sd, m + sd, color=color, alpha=0.15, linewidth=0)
+        if per_fold is not None:
+            f = per_fold.loc[per_fold["model"] == name]
+            ax.plot(f["n_fit_rows"] / 1000, f["valid_f1"], linestyle="none", marker="o", markersize=5,
+                    markerfacecolor="none", markeredgecolor=MODEL_STYLE[name]["color"], alpha=0.8,
+                    label="Validation F1, single fold")
+        ax.set_title(name, fontsize=13, fontweight="bold")
+        ax.set_xlabel("Training rows per fold (thousands)", fontsize=12)
+        ax.tick_params(labelsize=11)
+        ax.set_xticks(x, [f"{v:.0f}k\n({p:.0%})" for v, p in zip(x, s["train_size"])])
+        ax.grid(axis="y", color="#D5DEE1", linewidth=0.75)
+        ax.spines[["top", "right"]].set_visible(False)
+    axes[0].set_ylabel("Phishing F1", fontsize=12)
+    # One neutral legend (colour = model, given by the panel title), placed in the middle
+    # panel's empty lower area so its samples are never mistaken for data points.
+    grey = "#5B6B73"
+    handles = [plt.Line2D([], [], color="#1B262C", linestyle="-", marker="o", linewidth=2, label="Training F1"),
+               plt.Line2D([], [], color=grey, linestyle="--", marker="s", linewidth=2, label="Validation F1 (grouped CV)")]
+    if per_fold is not None:
+        handles.append(plt.Line2D([], [], color=grey, linestyle="none", marker="o", markerfacecolor="none",
+                                  label="Validation F1, single fold"))
+    axes[len(axes) // 2].legend(handles=handles, loc="lower right", fontsize=11, frameon=False)
+    fig.suptitle(title, fontsize=13)
+    fig.tight_layout()
+    _save_figure(fig, filename)
+    return fig
+
+
+def _draw_roc(curves, title, filename, zoom, rule_point):
+    """Shared ROC figure: zoomed top-left corner, full-range inset, legend with AUCs.
+
+    curves = [(name, fpr, tpr, std_or_None, label)]. With AUCs near 0.99 every
+    curve hugs the top-left corner, so the main panel is zoomed (axis ranges in
+    the zoom box of the inset) and the inset shows the usual full 0-1 ROC.
+    """
+    fig, ax = plt.subplots(figsize=(6.4, 6.6))
+    inset = ax.inset_axes([0.50, 0.07, 0.46, 0.42])
+    for a in (ax, inset):
+        for name, fpr, tpr, std, _ in curves:
+            st = MODEL_STYLE.get(name, {})
+            a.plot(fpr, tpr, color=st.get("color"), linestyle=st.get("linestyle", "-"), linewidth=2.2)
+            if std is not None:
+                a.fill_between(fpr, np.clip(tpr - std, 0, 1), np.clip(tpr + std, 0, 1),
+                               color=st.get("color"), alpha=0.18, linewidth=0)
+    inset.plot([0, 1], [0, 1], color="#5B6B73", linestyle=":", linewidth=1)
+    (x0, x1), (y0, y1) = zoom
+    inset.add_patch(plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, edgecolor="#1B262C", linewidth=1))
+    inset.set(xlim=(0, 1), ylim=(0, 1), xticks=[0, 0.5, 1], yticks=[0, 0.5, 1])
+    inset.tick_params(labelsize=10)
+    inset.set_title("full range (box = main view)", fontsize=10.5, color="#5B6B73")
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(y0, y1)
+    ax.set_xlabel("False positive rate (legitimate URLs flagged)", fontsize=13)
+    ax.set_ylabel("True positive rate (phishing URLs caught)", fontsize=13)
+    ax.tick_params(labelsize=12)
+    ax.grid(color="#D5DEE1", linewidth=0.75)
+    ax.spines[["top", "right"]].set_visible(False)
+    handles = [plt.Line2D([], [], color=MODEL_STYLE.get(n, {}).get("color"),
+                          linestyle=MODEL_STYLE.get(n, {}).get("linestyle", "-"), linewidth=2.2, label=label)
+               for n, _, _, _, label in curves]
+    if rule_point is not None:
+        # The fixed format rule is a yes/no rule: one operating point, not a curve.
+        fpr, tpr = rule_point
+        for a in (ax, inset):
+            a.plot([fpr], [tpr], marker="D", markersize=8 if a is ax else 5, color="#1B262C",
+                   markeredgecolor="white", linestyle="none", clip_on=False, zorder=5)
+        handles.append(plt.Line2D([], [], marker="D", markersize=8, color="#1B262C", markeredgecolor="white",
+                                  linestyle="none", label=f"Format rule, one point (FPR {fpr:.3f}, TPR {tpr:.3f})"))
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.45, -0.13), fontsize=12.5, frameon=False, ncol=1)
+    ax.set_title(title, fontsize=13.5)
+    fig.tight_layout()
+    _save_figure(fig, filename)
+    return fig
+
+
+def plot_cv_roc(roc_by_model: Mapping, title, filename=None, zoom=((0, 0.05), (0.95, 1.0)), rule_point=None):
+    """Mean grouped-CV ROC per model with a ±1 std band (roc_by_model = {name: roc_folds})."""
+    curves = []
+    for name, roc_folds in roc_by_model.items():
+        grid, mean, std, aucs = mean_roc_curve(roc_folds)
+        curves.append((name, grid, mean, std, f"{name}: AUC {aucs.mean():.4f} ± {aucs.std():.4f}"))
+    return _draw_roc(curves, title, filename, zoom, rule_point)
+
+
+def plot_test_roc(models: Mapping, X_test, y_test, title, filename=None,
+                  zoom=((0, 0.05), (0.95, 1.0)), rule_point=None):
+    """One-time held-out ROC of FITTED, frozen models; returns (figure, {name: AUC}).
+
+    Scores are predict_proba[:, 1], as in evaluate(), so the AUCs equal the
+    roc_auc column of reports/results.csv. Call only after selection is frozen.
+    """
+    curves, aucs = [], {}
+    for name, model in models.items():
+        score = model.predict_proba(X_test)[:, 1]
+        fpr, tpr, _ = roc_curve(y_test, score, pos_label=1)
+        aucs[name] = roc_auc_score(y_test, score)
+        curves.append((name, fpr, tpr, None, f"{name}: AUC {aucs[name]:.4f}"))
+    return _draw_roc(curves, title, filename, zoom, rule_point), aucs
